@@ -4,9 +4,11 @@
 @section('page-title', 'Dokumen Kerjasama')
 
 @section('header-actions')
+@if(Auth::user()->hasRole('super_admin'))
 <button onclick="document.getElementById('modal-create-doc').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
     <i class="fa-solid fa-plus mr-2"></i> Buat Draft Baru
 </button>
+@endif
 @endsection
 
 @section('content')

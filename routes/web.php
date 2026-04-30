@@ -18,9 +18,11 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
+    // Documents - accessible by all authenticated users
+    Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
+
     // Documents (Super Admin only)
     Route::middleware(['role:super_admin'])->group(function () {
-        Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
         Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
 
         Route::get('/tracking', function () {
@@ -41,6 +43,23 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
     Route::post('/documents/{id}/comments', [DocumentController::class, 'storeComment'])->name('documents.comments.store');
     Route::post('/documents/{id}/sign', [DocumentController::class, 'signDocument'])->name('documents.sign');
+
+    Route::get('/test-viewer', function (Illuminate\Http\Request $request) {
+        $docUrl = $request->session()->get('viewer_url') ?? "https://calibre-ebook.com/downloads/demos/demo.docx";
+        return view('test-viewer', compact('docUrl'));
+    })->name('test-viewer');
+
+    Route::post('/test-viewer/upload', function (Illuminate\Http\Request $request) {
+        $request->validate(['docx_file' => 'required|file|mimes:docx']);
+        $path = $request->file('docx_file')->store('public/temp_viewer');
+        
+        // Memastikan URL yang dikirim menggunakan domain Ngrok (bukan localhost)
+        $host = $request->getHost();
+        $scheme = str_contains($host, 'ngrok') ? 'https' : $request->getScheme();
+        $url = $scheme . '://' . $host . Storage::url($path);
+        
+        return redirect()->route('test-viewer')->with('viewer_url', $url);
+    })->name('test-viewer.upload');
 });
 
 require __DIR__.'/auth.php';

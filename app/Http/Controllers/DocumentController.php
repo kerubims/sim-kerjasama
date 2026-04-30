@@ -16,8 +16,23 @@ class DocumentController extends Controller
     {
         $user = Auth::user();
         
-        // Super Admin sees all documents
         $query = Document::with(['parent', 'parties.user'])->orderBy('created_at', 'desc');
+        
+        // Filter berdasarkan role
+        if ($user->hasRole('client')) {
+            // Client hanya melihat dokumen dimana dia menjadi party DAN status BUKAN draft
+            $query->where('status', '!=', 'draft')
+                  ->whereHas('parties', function ($q) use ($user) {
+                      $q->where('user_id', $user->id);
+                  });
+        } elseif ($user->hasRole('unit_pengusul')) {
+            // Unit Pengusul hanya melihat dokumen dimana dia menjadi party DAN status bukan draft & bukan review_client
+            $query->whereNotIn('status', ['draft', 'review_client'])
+                  ->whereHas('parties', function ($q) use ($user) {
+                      $q->where('user_id', $user->id);
+                  });
+        }
+        // Super Admin melihat semua dokumen (no filter)
         
         $documents = $query->paginate(10);
         $allDocs = Document::all(); // for parent selection
@@ -47,6 +62,7 @@ class DocumentController extends Controller
             'end_date' => $request->end_date,
             'parent_id' => $request->parent_id,
             'status' => 'draft',
+            'allow_client_upload' => false,
             'created_by' => Auth::id(),
             'document_number' => 'DOC-' . date('Ymd') . '-' . rand(1000, 9999),
             'content' => '<h1>Perjanjian Kerjasama</h1><p>Silakan edit isi perjanjian ini...</p>'
@@ -81,11 +97,22 @@ class DocumentController extends Controller
 
     public function editor($id)
     {
+        $user = Auth::user();
         $document = Document::with([
             'histories.user', 
             'comments.user', 
             'parties.user'
         ])->findOrFail($id);
+
+        // Access control: client cannot see draft documents
+        if ($user->hasRole('client') && $document->status === 'draft') {
+            abort(403, 'Anda belum memiliki akses ke dokumen ini.');
+        }
+
+        // Access control: unit_pengusul cannot see draft or review_client documents
+        if ($user->hasRole('unit_pengusul') && in_array($document->status, ['draft', 'review_client'])) {
+            abort(403, 'Anda belum memiliki akses ke dokumen ini.');
+        }
 
         return view('documents.editor', ['doc' => $document]);
     }
@@ -95,6 +122,24 @@ class DocumentController extends Controller
         $request->validate(['content' => 'required|string']);
         
         $document = Document::findOrFail($id);
+        $user = Auth::user();
+
+        // Check canEdit logic (matching reference)
+        $party = DocumentParty::where('document_id', $id)
+                              ->where('user_id', $user->id)
+                              ->first();
+        $userHasSigned = $party && $party->signature_path;
+
+        $canEdit = !$userHasSigned && (
+            ($user->hasRole('super_admin') && $document->status !== 'signed') ||
+            ($user->hasRole('client') && $document->status === 'review_client') ||
+            ($user->hasRole('unit_pengusul') && $document->status === 'review_unit')
+        );
+
+        if (!$canEdit) {
+            return response()->json(['success' => false, 'message' => 'Anda tidak memiliki izin untuk mengedit dokumen ini.'], 403);
+        }
+
         $document->update(['content' => $request->content]);
 
         DocumentHistory::create([
@@ -109,17 +154,22 @@ class DocumentController extends Controller
 
     public function updateStatus(Request $request, $id)
     {
-        $request->validate(['status' => 'required|string', 'allowUpload' => 'boolean']);
+        $request->validate(['status' => 'required|string']);
         
         $document = Document::findOrFail($id);
-        $document->update(['status' => $request->status]);
+        
+        $updateData = ['status' => $request->status];
+
+        // Save allow_client_upload when sending to client
+        if ($request->status === 'review_client') {
+            $updateData['allow_client_upload'] = $request->boolean('allowUpload', false);
+        }
+
+        $document->update($updateData);
 
         $message = 'Status berubah menjadi ' . $request->status;
         if ($request->status === 'review_client') {
-            $message = 'Dikirim ke Client' . ($request->allowUpload ? ' (dengan izin upload draft)' : '');
-        } elseif ($request->status === 'signed' || $request->status === 'review_unit') {
-            // Also logic for signature would go here later (Phase 5)
-            $message = 'Menandatangani dokumen';
+            $message = 'Dikirim ke Client' . ($request->boolean('allowUpload') ? ' (dengan izin upload draft)' : '');
         }
 
         DocumentHistory::create([
@@ -165,7 +215,8 @@ class DocumentController extends Controller
         ]);
 
         $document = Document::findOrFail($id);
-        $userId = Auth::id();
+        $user = Auth::user();
+        $userId = $user->id;
 
         $party = DocumentParty::where('document_id', $id)
                               ->where('user_id', $userId)
@@ -173,6 +224,10 @@ class DocumentController extends Controller
 
         if (!$party) {
             return response()->json(['success' => false, 'message' => 'Anda bukan pihak dalam dokumen ini.'], 403);
+        }
+
+        if ($party->signature_path) {
+            return response()->json(['success' => false, 'message' => 'Anda sudah menandatangani dokumen ini.'], 400);
         }
 
         if ($request->hasFile('signature_file')) {
@@ -187,19 +242,27 @@ class DocumentController extends Controller
                 'document_id' => $document->id,
                 'user_id' => $userId,
                 'action' => 'Signed',
-                'message' => 'Mengunggah tanda tangan'
+                'message' => 'Menandatangani dokumen (upload tanda tangan)'
             ]);
 
-            $totalParties = DocumentParty::where('document_id', $id)->count();
-            $signedParties = DocumentParty::where('document_id', $id)->whereNotNull('signature_path')->count();
-
-            if ($signedParties === $totalParties) {
+            // Auto status change based on who signs (matching reference logic)
+            if ($user->hasRole('client')) {
+                // Client signs → status moves to review_unit
+                $document->update(['status' => 'review_unit']);
+                DocumentHistory::create([
+                    'document_id' => $document->id,
+                    'user_id' => $userId,
+                    'action' => 'Status Change',
+                    'message' => 'Client telah menandatangani, status menjadi REVIEW UNIT'
+                ]);
+            } elseif ($user->hasRole('unit_pengusul')) {
+                // Unit signs → status moves to signed (AKTIF)
                 $document->update(['status' => 'signed']);
                 DocumentHistory::create([
                     'document_id' => $document->id,
                     'user_id' => $userId,
                     'action' => 'Status Change',
-                    'message' => 'Semua pihak telah menandatangani, status menjadi AKTIF'
+                    'message' => 'Unit Pengusul telah menandatangani, dokumen AKTIF'
                 ]);
             }
 

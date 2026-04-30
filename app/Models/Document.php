@@ -18,6 +18,7 @@ class Document extends Model
         'start_date',
         'end_date',
         'status',
+        'allow_client_upload',
         'created_by',
     ];
 
