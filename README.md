@@ -1,58 +1,98 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# SIM-KERMA (Sistem Informasi Manajemen Kerjasama)
 
 <p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
+    <img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="300" alt="Laravel Logo">
 </p>
 
-## About Laravel
+SIM-KERMA adalah platform berbasis web yang dirancang untuk mengelola siklus hidup dokumen kerjasama (MoU, MoA, dan IA) secara digital, kolaboratif, dan efisien.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## 🚀 Fitur Utama
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+- **Dashboard Real-time**: Statistik dokumen berdasarkan status, jenis, dan kategori.
+- **Manajemen Dokumen**: Hierarki dokumen (MoU -> MoA -> IA) dengan pelacakan status.
+- **Editor Kolaboratif**: Integrasi TinyMCE untuk penyuntingan dokumen langsung di browser.
+- **Import/Export Pintar**: Dukungan import dari DOCX dan export ke PDF dengan layout presisi A4.
+- **E-Signature & Stamp**: Manajemen tanda tangan dan stempel digital yang terkompresi otomatis.
+- **Role-Based Access Control (RBAC)**: Pengaturan hak akses untuk Admin, Unit Kerja, dan Mitra.
+- **Pengingat Masa Berlaku**: Notifikasi otomatis sebelum dokumen kedaluwarsa.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+---
 
-## Learning Laravel
+## 💻 Panduan Instalasi (Lokal)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+### Prasyarat
+- PHP >= 8.3
+- Composer
+- Node.js & NPM
+- MySQL/MariaDB
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Langkah-langkah
+1. **Clone Repository**
+   ```bash
+   git clone https://github.com/kerubims/sim-kerjasama.git
+   cd sim-kerjasama
+   ```
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+2. **Instal Dependensi Backend**
+   ```bash
+   composer install
+   ```
 
-## Agentic Development
+3. **Instal Dependensi Frontend**
+   ```bash
+   npm install
+   ```
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+4. **Konfigurasi Environment**
+   Salin file `.env.example` ke `.env` dan sesuaikan konfigurasi database Anda.
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
 
-```bash
-composer require laravel/boost --dev
+5. **Migrasi & Seed Database**
+   ```bash
+   php artisan migrate --seed
+   ```
 
-php artisan boost:install
-```
+6. **Jalankan Aplikasi**
+   Gunakan perintah berikut untuk menjalankan server development dan Vite:
+   ```bash
+   npm run dev
+   ```
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+---
 
-## Contributing
+## 📖 Cara Pengoperasian
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+### 1. Login Pertama Kali
+- Gunakan akun admin default yang telah disediakan melalui seeder (cek `DatabaseSeeder.php`).
+- Masuk ke Dashboard untuk melihat ringkasan kerjasama.
 
-## Code of Conduct
+### 2. Membuat Dokumen Baru
+- Navigasi ke menu **Dokumen**.
+- Pilih **Tambah Dokumen**.
+- Isi detail kerjasama (Judul, Mitra, Masa Berlaku).
+- Gunakan editor TinyMCE untuk menulis konten atau **Import dari Word (.docx)**.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+### 3. Alur Persetujuan
+- Dokumen yang dibuat akan berstatus `Draft`.
+- Unggah tanda tangan atau stempel jika diperlukan melalui modul tanda tangan.
+- Ubah status menjadi `Aktif` setelah finalisasi.
 
-## Security Vulnerabilities
+### 4. Cetak/Export
+- Gunakan tombol **Cetak PDF** pada detail dokumen untuk mengunduh versi fisik dokumen yang sudah diformat secara profesional.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+---
 
-## License
+## 🛠️ Tech Stack
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+- **Backend**: Laravel 13
+- **Frontend**: Blade, Tailwind CSS, Vite
+- **Database**: MySQL 8.0
+- **Storage**: Intervention Image (Optimasi gambar)
+- **Document Engine**: Gotenberg (PDF Generation), Mammoth.js (Docx Parsing)
+
+## 📄 Lisensi
+
+Proyek ini berada di bawah lisensi [MIT](LICENSE).

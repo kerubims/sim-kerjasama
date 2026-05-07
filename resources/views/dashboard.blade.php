@@ -29,14 +29,14 @@
         <div class="flex justify-between items-start mb-4">
             <div>
                 <div class="text-sm text-slate-500 font-medium">Total Mitra</div>
-                <div class="text-3xl font-bold text-slate-900 mt-1">{{ number_format($stats['total']) }}</div>
+                <div class="text-3xl font-bold text-slate-900 mt-1">{{ number_format($stats['total_mitra']) }}</div>
             </div>
             <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
                 <i class="fa-solid fa-building-columns"></i>
             </div>
         </div>
-        <div class="flex items-center text-xs font-medium text-green-600">
-            <i class="fa-solid fa-arrow-up mr-1"></i> 12% <span class="text-slate-400 ml-1 font-normal">vs bulan lalu</span>
+        <div class="text-xs font-medium text-slate-500">
+            Total mitra terdaftar
         </div>
     </div>
 
@@ -51,8 +51,8 @@
                 <i class="fa-solid fa-file-circle-check"></i>
             </div>
         </div>
-        <div class="flex items-center text-xs font-medium text-green-600">
-            <i class="fa-solid fa-arrow-up mr-1"></i> 5% <span class="text-slate-400 ml-1 font-normal">MoU & MoA</span>
+        <div class="text-xs font-medium text-slate-500">
+            Dokumen status "Signed"
         </div>
     </div>
 
@@ -111,11 +111,10 @@
         <div class="h-48 relative flex justify-center">
             <canvas id="donutChart"></canvas>
         </div>
-        <div class="mt-6 grid grid-cols-2 gap-4 text-xs">
-            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-800"></span> Industri</div>
-            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-blue-400"></span> Pemerintah</div>
-            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-teal-400"></span> NGO</div>
-            <div class="flex items-center gap-2"><span class="w-2 h-2 rounded-full bg-slate-300"></span> Lainnya</div>
+        <div class="mt-6 grid grid-cols-3 gap-4 text-xs text-center">
+            <div class="flex items-center justify-center gap-2"><span class="w-2 h-2 rounded-full bg-[#1e3a5f]"></span> MoU</div>
+            <div class="flex items-center justify-center gap-2"><span class="w-2 h-2 rounded-full bg-[#60a5fa]"></span> MoA</div>
+            <div class="flex items-center justify-center gap-2"><span class="w-2 h-2 rounded-full bg-[#2dd4bf]"></span> IA</div>
         </div>
     </div>
 </div>
@@ -137,18 +136,30 @@
         <table class="w-full text-left text-sm text-slate-600">
             <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
                 <tr>
-                    <th class="px-6 py-4">Nama Mitra</th>
+                    <th class="px-6 py-4">No</th>
+                    <th class="px-6 py-4">Judul</th>
                     <th class="px-6 py-4">Jenis</th>
-                    <th class="px-6 py-4">Nomor Dokumen</th>
-                    <th class="px-6 py-4">Tanggal Mulai</th>
+                    <th class="px-6 py-4">Client</th>
+                    <th class="px-6 py-4">Unit</th>
+                    <th class="px-6 py-4">Tanggal Dibuat</th>
+                    <th class="px-6 py-4">Tanggal Selesai</th>
                     <th class="px-6 py-4">Status</th>
                     <th class="px-6 py-4 text-right">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                @forelse($recentDocs as $doc)
+                @forelse($documents as $idx => $doc)
                 <tr class="hover:bg-slate-50 transition">
-                    <td class="px-6 py-4 font-medium text-slate-900">{{ $doc->parties->where('role_type', 'client')->first()->user->name ?? '-' }}</td>
+                    <td class="px-6 py-4 text-slate-500">{{ $documents->firstItem() + $idx }}</td>
+                    <td class="px-6 py-4 font-medium text-slate-900">
+                        @if($doc->parent_id)
+                            <i class="fa-solid fa-turn-up fa-rotate-90 text-slate-400 mr-2"></i>
+                        @endif
+                        {{ $doc->title }}
+                        @if($doc->parent_id)
+                            <div class="text-xs text-slate-500 mt-1">Rujukan: {{ $doc->parent->title ?? '' }}</div>
+                        @endif
+                    </td>
                     <td class="px-6 py-4">
                         @php
                             $typeClass = match(strtolower($doc->type)) {
@@ -157,12 +168,12 @@
                                 default => 'bg-purple-100 text-purple-700',
                             };
                         @endphp
-                        <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">
-                            {{ strtoupper($doc->type) }}
-                        </span>
+                        <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-4 font-mono text-xs text-slate-500">{{ $doc->document_number ?? '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
+                    <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4">
                         @php
                             $statusClass = match($doc->status) {
@@ -178,23 +189,28 @@
                                 default => strtoupper(str_replace('_', ' ', $doc->status)),
                             };
                         @endphp
-                        <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $statusClass }}">
-                            {{ $statusLabel }}
-                        </span>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $statusClass }}">{{ $statusLabel }}</span>
                     </td>
                     <td class="px-6 py-4 text-right">
-                        <a href="{{ route('documents.editor', ['id' => $doc->id]) }}" class="text-slate-400 hover:text-blue-600 transition">
-                            <i class="fa-solid fa-eye"></i>
+                        <a href="{{ route('documents.editor', ['id' => $doc->id]) }}" class="text-blue-600 hover:text-blue-800 text-xs font-medium">
+                            <i class="fa-solid fa-pen-to-square mr-1"></i> Buka / Edit
                         </a>
                     </td>
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="6" class="px-6 py-8 text-center text-slate-400">Belum ada dokumen</td>
+                    <td colspan="9" class="px-6 py-8 text-center text-slate-400">Belum ada dokumen</td>
                 </tr>
                 @endforelse
             </tbody>
         </table>
+    </div>
+
+    <!-- Pagination -->
+    <div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between bg-slate-50">
+        <div class="w-full">
+            {{ $documents->links() }}
+        </div>
     </div>
 </div>
 @endsection
@@ -204,9 +220,11 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     @if($isSuperAdmin)
+    const chartData = @json($chartData);
+
     // Bar Chart - Tren Kerjasama
     const barCtx = document.getElementById('barChart');
-    if (barCtx) {
+    if (barCtx && chartData.bar) {
         new Chart(barCtx, {
             type: 'bar',
             data: {
@@ -214,13 +232,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 datasets: [
                     {
                         label: 'MoU',
-                        data: [18, 22, 15, 25, 20, 30, 28, 35, 22, 18, 25, 30],
+                        data: chartData.bar.mou,
                         backgroundColor: '#3b82f6',
                         borderRadius: 4,
                     },
                     {
                         label: 'MoA',
-                        data: [12, 15, 10, 18, 14, 22, 20, 25, 16, 12, 18, 22],
+                        data: chartData.bar.moa,
                         backgroundColor: '#94a3b8',
                         borderRadius: 4,
                     }
@@ -232,7 +250,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 20, font: { size: 11 } } } },
                 scales: {
                     x: { grid: { display: false }, ticks: { font: { size: 11 } } },
-                    y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 } } }
+                    y: { grid: { color: '#f1f5f9' }, ticks: { font: { size: 11 }, stepSize: 1 } }
                 }
             }
         });
@@ -240,14 +258,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Donut Chart - Kategori Mitra
     const donutCtx = document.getElementById('donutChart');
-    if (donutCtx) {
+    if (donutCtx && chartData.donut) {
         new Chart(donutCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Industri', 'Pemerintah', 'NGO', 'Lainnya'],
+                labels: chartData.donut.labels,
                 datasets: [{
-                    data: [45, 25, 20, 10],
-                    backgroundColor: ['#1e3a5f', '#60a5fa', '#2dd4bf', '#cbd5e1'],
+                    data: chartData.donut.data,
+                    backgroundColor: ['#1e3a5f', '#60a5fa', '#2dd4bf'],
                     borderWidth: 0,
                 }]
             },

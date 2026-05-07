@@ -63,11 +63,6 @@
                         <input type="checkbox" name="remember" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
                         Ingat saya
                     </label>
-                    @if (Route::has('password.request'))
-                        <a href="{{ route('password.request') }}" class="text-sm text-blue-600 hover:underline font-medium">
-                            Lupa password?
-                        </a>
-                    @endif
                 </div>
 
                 <!-- Submit -->

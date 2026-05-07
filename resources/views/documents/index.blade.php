@@ -51,8 +51,8 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->first()->user->name ?? '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->first()->user->name ?? '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4">

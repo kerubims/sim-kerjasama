@@ -4,7 +4,7 @@
 @section('page-title', 'Tracking Dokumen')
 
 @section('content')
-<div x-data="trackingPage()" class="space-y-6">
+<div class="space-y-6">
     <!-- Search Bar -->
     <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <div class="flex items-center gap-3 mb-4">
@@ -16,148 +16,163 @@
                 <p class="text-sm text-slate-500">Temukan hierarki dokumen berdasarkan nomor atau judul kerjasama</p>
             </div>
         </div>
-        <div class="flex gap-3">
+        <form method="GET" action="{{ route('tracking.index') }}" class="flex gap-3">
             <div class="relative flex-1">
                 <i class="fa-solid fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                <input type="text" x-model="searchQuery" @keyup.enter="search()"
+                <input type="text" name="search" value="{{ $search }}"
                        placeholder="Ketik nomor dokumen atau judul kerjasama..."
                        class="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition">
             </div>
-            <button @click="search()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition">
                 <i class="fa-solid fa-search mr-2"></i> Lacak
             </button>
-        </div>
+            @if($search)
+            <a href="{{ route('tracking.index') }}" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-lg text-sm font-medium transition">
+                <i class="fa-solid fa-times"></i>
+            </a>
+            @endif
+        </form>
     </div>
 
     <!-- Document Hierarchy Tree -->
-    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6" x-show="showTree" x-transition>
+    @if($documents->count() > 0)
+    <div x-data="{ openNodes: {} }" class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2">
             <i class="fa-solid fa-diagram-project text-blue-600"></i> Hierarki Dokumen Kerjasama
+            <span class="text-sm font-normal text-slate-500 ml-2">({{ $documents->count() }} root)</span>
         </h3>
 
-        <!-- Tree Visualization -->
         <div class="space-y-4">
-            <!-- MoU Level -->
+            @foreach($documents as $mou)
+            @php
+                $mouKey = 'mou_' . $mou->id;
+                $statusClass = match($mou->status) {
+                    'signed' => 'bg-green-100 text-green-700',
+                    'draft' => 'bg-slate-100 text-slate-600',
+                    'review_client' => 'bg-yellow-100 text-yellow-700',
+                    'review_unit' => 'bg-orange-100 text-orange-700',
+                    default => 'bg-slate-100 text-slate-600',
+                };
+                $statusLabel = match($mou->status) {
+                    'signed' => 'Aktif',
+                    'draft' => 'Draft',
+                    'review_client' => 'Review Client',
+                    'review_unit' => 'Review Unit',
+                    default => ucfirst($mou->status),
+                };
+                $clientName = $mou->parties->where('role_type', 'client')->first()?->user?->name ?? '-';
+                $unitName = $mou->parties->where('role_type', 'unit_pengusul')->first()?->user?->name ?? '-';
+            @endphp
             <div class="border border-slate-200 rounded-xl overflow-hidden">
-                <div class="bg-blue-50 px-6 py-4 flex items-center gap-4 cursor-pointer" @click="toggleNode('mou1')">
-                    <i class="fa-solid fa-chevron-down text-blue-600 transition-transform" :class="{ 'rotate-180': !openNodes.mou1 }"></i>
+                <!-- MoU Level -->
+                <div class="bg-blue-50 px-6 py-4 flex items-center gap-4 cursor-pointer" @click="openNodes['{{ $mouKey }}'] = !openNodes['{{ $mouKey }}']">
+                    <i class="fa-solid fa-chevron-down text-blue-600 transition-transform text-sm" :class="{ 'rotate-180': !openNodes['{{ $mouKey }}'] }"></i>
                     <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
                         <i class="fa-solid fa-handshake"></i>
                     </div>
                     <div class="flex-1">
-                        <div class="font-bold text-slate-900">MoU - Kerjasama Penelitian AI</div>
-                        <div class="text-xs text-slate-500 mt-0.5">023/MOU/TI/2023 • PT Teknologi Maju • 15 Jan 2024 - 15 Jan 2026</div>
+                        <div class="font-bold text-slate-900">{{ strtoupper($mou->type) }} — {{ $mou->title }}</div>
+                        <div class="text-xs text-slate-500 mt-0.5">
+                            {{ $mou->document_number ?? 'No. belum ditetapkan' }} • {{ $clientName }}
+                            @if($mou->start_date && $mou->end_date)
+                            • {{ \Carbon\Carbon::parse($mou->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($mou->end_date)->format('d M Y') }}
+                            @endif
+                        </div>
                     </div>
-                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
+                    <span class="px-3 py-1 rounded-full text-xs font-medium {{ $statusClass }}">{{ $statusLabel }}</span>
+                    <a href="{{ route('documents.editor', $mou->id) }}" @click.stop class="text-slate-400 hover:text-blue-600 transition" title="Buka Editor">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-sm"></i>
+                    </a>
                 </div>
 
-                <div x-show="openNodes.mou1" x-transition class="border-t border-slate-200">
-                    <!-- MoA Level -->
+                @if($mou->children->count() > 0)
+                <div x-show="openNodes['{{ $mouKey }}']" x-transition class="border-t border-slate-200">
+                    @foreach($mou->children as $moa)
+                    @php
+                        $moaKey = 'moa_' . $moa->id;
+                        $moaStatusClass = match($moa->status) {
+                            'signed' => 'bg-green-100 text-green-700',
+                            'draft' => 'bg-slate-100 text-slate-600',
+                            default => 'bg-yellow-100 text-yellow-700',
+                        };
+                        $moaStatusLabel = match($moa->status) {
+                            'signed' => 'Aktif', 'draft' => 'Draft',
+                            'review_client' => 'Review Client', 'review_unit' => 'Review Unit',
+                            default => ucfirst($moa->status),
+                        };
+                        $moaClient = $moa->parties->where('role_type', 'client')->first()?->user?->name ?? '-';
+                    @endphp
                     <div class="ml-8 border-l-2 border-blue-200">
-                        <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50 cursor-pointer" @click="toggleNode('moa1')">
-                            <i class="fa-solid fa-chevron-down text-purple-500 text-xs transition-transform" :class="{ 'rotate-180': !openNodes.moa1 }"></i>
+                        <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50 cursor-pointer" @click="openNodes['{{ $moaKey }}'] = !openNodes['{{ $moaKey }}']">
+                            <i class="fa-solid fa-chevron-down text-purple-500 text-xs transition-transform" :class="{ 'rotate-180': !openNodes['{{ $moaKey }}'] }"></i>
                             <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xs">
                                 <i class="fa-solid fa-file-signature"></i>
                             </div>
                             <div class="flex-1">
-                                <div class="font-semibold text-slate-800 text-sm">MoA - Implementasi Sistem Informasi RS</div>
-                                <div class="text-xs text-slate-500">045/MOA/FK/2024 • PT RSJ Kota Malang</div>
+                                <div class="font-semibold text-slate-800 text-sm">{{ strtoupper($moa->type) }} — {{ $moa->title }}</div>
+                                <div class="text-xs text-slate-500">{{ $moa->document_number ?? 'No. belum ditetapkan' }} • {{ $moaClient }}</div>
                             </div>
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">Review</span>
+                            <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $moaStatusClass }}">{{ $moaStatusLabel }}</span>
+                            <a href="{{ route('documents.editor', $moa->id) }}" @click.stop class="text-slate-400 hover:text-blue-600 transition" title="Buka Editor">
+                                <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                            </a>
                         </div>
 
-                        <div x-show="openNodes.moa1" x-transition>
-                            <!-- IA Level -->
+                        @if($moa->children->count() > 0)
+                        <div x-show="openNodes['{{ $moaKey }}']" x-transition>
+                            @foreach($moa->children as $ia)
+                            @php
+                                $iaStatusClass = match($ia->status) {
+                                    'signed' => 'bg-green-100 text-green-700',
+                                    'draft' => 'bg-slate-100 text-slate-600',
+                                    default => 'bg-yellow-100 text-yellow-700',
+                                };
+                                $iaStatusLabel = match($ia->status) {
+                                    'signed' => 'Aktif', 'draft' => 'Draft',
+                                    'review_client' => 'Review Client', 'review_unit' => 'Review Unit',
+                                    default => ucfirst($ia->status),
+                                };
+                            @endphp
                             <div class="ml-8 border-l-2 border-purple-200">
                                 <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50">
                                     <div class="w-6 h-6 bg-teal-500 rounded flex items-center justify-center text-white text-xs">
                                         <i class="fa-solid fa-clipboard-check text-[10px]"></i>
                                     </div>
                                     <div class="flex-1">
-                                        <div class="font-medium text-slate-700 text-sm">IA - Workshop IoT Terapan</div>
-                                        <div class="text-xs text-slate-500">089/IA/TI/2024 • 12 Jun 2024</div>
+                                        <div class="font-medium text-slate-700 text-sm">{{ strtoupper($ia->type) }} — {{ $ia->title }}</div>
+                                        <div class="text-xs text-slate-500">{{ $ia->document_number ?? 'No. belum ditetapkan' }} • {{ $ia->created_at->format('d M Y') }}</div>
                                     </div>
-                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600">Draft</span>
+                                    <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $iaStatusClass }}">{{ $iaStatusLabel }}</span>
+                                    <a href="{{ route('documents.editor', $ia->id) }}" class="text-slate-400 hover:text-blue-600 transition" title="Buka Editor">
+                                        <i class="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                                    </a>
                                 </div>
                             </div>
+                            @endforeach
                         </div>
+                        @endif
                     </div>
-
-                    <!-- Another MoA -->
-                    <div class="ml-8 border-l-2 border-blue-200">
-                        <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50">
-                            <div class="w-1 h-1"></div>
-                            <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xs">
-                                <i class="fa-solid fa-file-signature"></i>
-                            </div>
-                            <div class="flex-1">
-                                <div class="font-semibold text-slate-800 text-sm">MoA - Pengembangan Lab AI</div>
-                                <div class="text-xs text-slate-500">078/MOA/TI/2024 • PT Teknologi Maju</div>
-                            </div>
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                        </div>
-                    </div>
+                    @endforeach
                 </div>
+                @endif
             </div>
-
-            <!-- Second MoU -->
-            <div class="border border-slate-200 rounded-xl overflow-hidden">
-                <div class="bg-blue-50 px-6 py-4 flex items-center gap-4 cursor-pointer" @click="toggleNode('mou2')">
-                    <i class="fa-solid fa-chevron-down text-blue-600 transition-transform" :class="{ 'rotate-180': !openNodes.mou2 }"></i>
-                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                        <i class="fa-solid fa-handshake"></i>
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-bold text-slate-900">MoU - Program Magang Industri</div>
-                        <div class="text-xs text-slate-500 mt-0.5">067/MOU/FKIP/2024 • Dinas Pendidikan Jatim • 10 Mar 2024 - 10 Mar 2027</div>
-                    </div>
-                    <span class="px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                </div>
-
-                <div x-show="openNodes.mou2" x-transition class="border-t border-slate-200">
-                    <div class="ml-8 border-l-2 border-blue-200">
-                        <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50">
-                            <div class="w-1 h-1"></div>
-                            <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xs">
-                                <i class="fa-solid fa-file-signature"></i>
-                            </div>
-                            <div class="flex-1">
-                                <div class="font-semibold text-slate-800 text-sm">MoA - Kurikulum Berbasis Industri</div>
-                                <div class="text-xs text-slate-500">099/MOA/FKIP/2024 • Dinas Pendidikan</div>
-                            </div>
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Aktif</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            @endforeach
         </div>
     </div>
-
-    <!-- Empty State (before search) -->
-    <div x-show="!showTree" class="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
+    @else
+    <!-- Empty State -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-12 text-center">
         <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <i class="fa-solid fa-diagram-project text-3xl text-slate-400"></i>
         </div>
-        <h3 class="font-bold text-slate-700 text-lg">Mulai Lacak Dokumen</h3>
-        <p class="text-slate-500 text-sm mt-2 max-w-md mx-auto">Masukkan nomor atau judul dokumen pada kolom pencarian di atas untuk melihat hierarki dokumen kerjasama (MoU → MoA → IA).</p>
+        @if($search)
+        <h3 class="font-bold text-slate-700 text-lg">Tidak Ditemukan</h3>
+        <p class="text-slate-500 text-sm mt-2">Tidak ada dokumen yang cocok dengan pencarian "{{ $search }}".</p>
+        @else
+        <h3 class="font-bold text-slate-700 text-lg">Belum Ada Dokumen</h3>
+        <p class="text-slate-500 text-sm mt-2 max-w-md mx-auto">Buat dokumen MoU terlebih dahulu di halaman Dokumen Kerjasama untuk melihat hierarki di sini.</p>
+        @endif
     </div>
+    @endif
 </div>
 @endsection
-
-@push('scripts')
-<script>
-function trackingPage() {
-    return {
-        searchQuery: '',
-        showTree: false,
-        openNodes: { mou1: true, moa1: true, mou2: false },
-        search() {
-            this.showTree = this.searchQuery.trim().length > 0 || true;
-        },
-        toggleNode(key) {
-            this.openNodes[key] = !this.openNodes[key];
-        }
-    }
-}
-</script>
-@endpush

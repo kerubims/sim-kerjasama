@@ -76,6 +76,9 @@
             @endif
 
             @if($user->hasRole('unit_pengusul') && $doc->status === 'review_unit' && !$userHasSigned)
+            <button @click="rejectDocument()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
+                <i class="fa-solid fa-xmark mr-1"></i> Tolak / Kembalikan
+            </button>
             <button @click="showSignModal=true" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
                 <i class="fa-solid fa-signature mr-1"></i> Tanda Tangan Final
             </button>
@@ -98,10 +101,8 @@
     <!-- Main Editor Area -->
     <div class="flex-1 flex overflow-hidden">
         <!-- WYSIWYG Container -->
-        <div class="flex-1 bg-slate-100 overflow-y-auto p-8 flex justify-center">
-            <div class="w-full max-w-[816px] bg-white shadow-sm min-h-[1056px] p-0">
-                <textarea id="editor-area" class="w-full h-full opacity-0">{!! $doc->content !!}</textarea>
-            </div>
+        <div class="flex-1 flex flex-col bg-slate-100 border-none">
+            <textarea id="editor-area" class="w-full h-full opacity-0 border-none">{!! $doc->content !!}</textarea>
         </div>
 
         <!-- Sidebar -->
@@ -131,14 +132,23 @@
             </div>
 
             <!-- Comments -->
-            <div x-show="activeTab==='comments'" class="flex-1 flex flex-col" style="display:none;">
+            <div x-show="activeTab==='comments'" class="flex-1 flex flex-col min-h-0" style="display:none;">
                 <div class="flex-1 overflow-y-auto p-4 space-y-4">
                     @forelse($doc->comments->sortByDesc('created_at') as $c)
-                    <div class="bg-slate-50 rounded-lg p-3 border border-slate-200">
-                        <div class="flex items-center gap-2 mb-2">
-                            <img src="https://ui-avatars.com/api/?name={{ urlencode($c->user->name) }}&background=0D8ABC&color=fff" class="w-6 h-6 rounded-full" alt="">
+                    <div class="comment-block bg-slate-50 rounded-lg p-3 border border-slate-200 cursor-pointer hover:bg-slate-100 transition {{ $c->is_resolved ? 'opacity-60' : '' }}" @click="scrollToAnchor('{{ $c->anchor_id }}')">
+                        <div class="flex items-start gap-2 mb-2">
+                            <img src="https://ui-avatars.com/api/?name={{ urlencode($c->user->name) }}&background=0D8ABC&color=fff" class="w-6 h-6 rounded-full mt-0.5" alt="">
                             <div class="flex-1">
-                                <div class="text-xs font-semibold text-slate-700">{{ $c->user->name }}</div>
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="text-xs font-semibold text-slate-700">{{ $c->user->name }}</div>
+                                    @if($c->is_resolved)
+                                    <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-2"><i class="fa-solid fa-check mr-1"></i>Selesai</span>
+                                    @else
+                                        @if($canEdit)
+                                        <button @click.stop="resolveComment({{ $c->id }}, '{{ $c->anchor_id }}', $event.currentTarget.closest('.comment-block'))" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-200 hover:bg-green-500 hover:text-white text-slate-600 transition ml-2"><i class="fa-solid fa-check mr-1"></i>Selesaikan</button>
+                                        @endif
+                                    @endif
+                                </div>
                                 <div class="text-xs text-slate-400">{{ $c->created_at->diffForHumans() }}</div>
                             </div>
                         </div>
@@ -192,6 +202,8 @@ function editorPage() {
         allowUpload: false,
         signaturePreview: null,
         signatureFile: null,
+        activeCommentAnchor: null,
+        activeCommentQuote: null,
         csrfToken: document.querySelector('meta[name="csrf-token"]').content,
 
         init() {
@@ -264,17 +276,65 @@ function editorPage() {
                     }
                 });
 
+                // Menu Dropdown untuk merubah ukuran kertas / canvas
+                editor.ui.registry.addMenuButton('papersize', {
+                    text: 'Ukuran Kertas',
+                    icon: 'document-properties',
+                    fetch: function (callback) {
+                        var items = [
+                            {
+                                type: 'menuitem',
+                                text: 'A4 Portrait (21cm x 29.7cm)',
+                                onAction: function () {
+                                    editor.dom.setStyle(editor.getBody(), 'width', '21cm');
+                                    editor.dom.setStyle(editor.getBody(), 'min-height', '29.7cm');
+                                    editor.dom.setStyle(editor.getBody(), 'padding', '2.5cm 2cm');
+                                }
+                            },
+                            {
+                                type: 'menuitem',
+                                text: 'A4 Landscape (29.7cm x 21cm)',
+                                onAction: function () {
+                                    editor.dom.setStyle(editor.getBody(), 'width', '29.7cm');
+                                    editor.dom.setStyle(editor.getBody(), 'min-height', '21cm');
+                                    editor.dom.setStyle(editor.getBody(), 'padding', '2cm 2.5cm');
+                                }
+                            },
+                            {
+                                type: 'menuitem',
+                                text: 'F4 / Folio (21.5cm x 33cm)',
+                                onAction: function () {
+                                    editor.dom.setStyle(editor.getBody(), 'width', '21.5cm');
+                                    editor.dom.setStyle(editor.getBody(), 'min-height', '33cm');
+                                    editor.dom.setStyle(editor.getBody(), 'padding', '2.5cm 2cm');
+                                }
+                            },
+                            {
+                                type: 'menuitem',
+                                text: 'Auto Adjust (Fluid Canvas)',
+                                onAction: function () {
+                                    editor.dom.setStyle(editor.getBody(), 'width', 'calc(100% - 4rem)');
+                                    editor.dom.setStyle(editor.getBody(), 'min-height', '100vh');
+                                    editor.dom.setStyle(editor.getBody(), 'padding', '2rem');
+                                }
+                            }
+                        ];
+                        callback(items);
+                    }
+                });
+
                 // Context menu for comments
                 editor.ui.registry.addMenuItem('addcomment', {
                     text: 'Berikan Komentar',
                     icon: 'comment',
                     onAction: () => {
-                        const selection = editor.selection.getContent({format:'text'});
-                        if (!selection) return;
+                        const selectionText = editor.selection.getContent({format:'text'});
+                        if (!selectionText) return;
                         const commentId = 'mark_' + Date.now();
                         const content = `<span id="${commentId}" style="background-color:#fef08a;padding:2px 0;" data-comment-id="${commentId}">${editor.selection.getContent()}</span>`;
                         editor.selection.setContent(content);
-                        document.getElementById('comment-input')?.focus();
+                        
+                        window.dispatchEvent(new CustomEvent('init-comment', {detail: {id: commentId, text: selectionText}}));
                     }
                 });
                 editor.ui.registry.addContextMenu('selection', {
@@ -285,7 +345,7 @@ function editorPage() {
             let toolbarConfig = false;
             if (canEdit) {
                 const importBtn = (canImportDocx ? ' importdocx |' : '');
-                toolbarConfig = `undo redo |${importBtn} blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent | forecolor backcolor removeformat | charmap emoticons | fullscreen preview | help`;
+                toolbarConfig = `undo redo | papersize${importBtn} blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent | forecolor backcolor removeformat | charmap emoticons | fullscreen preview | help`;
             }
 
             tinymce.init({
@@ -308,9 +368,11 @@ function editorPage() {
                         font-family: Tahoma, "Times New Roman", Times, serif;
                         font-size: 11pt;
                         line-height: 1.5;
+                        transition: width 0.3s ease, min-height 0.3s ease, padding 0.3s ease;
                     }
                     html {
                         background-color: #f1f5f9;
+                        scroll-behavior: smooth;
                     }
                     p { margin-top: 0; margin-bottom: 10px; }
                     table { border-collapse: collapse; width: 100%; }
@@ -325,6 +387,17 @@ function editorPage() {
                 contextmenu: 'addcomment link image table',
                 setup: customSetup
             });
+
+            window.addEventListener('init-comment', (e) => {
+                this.activeCommentAnchor = e.detail.id;
+                this.activeCommentQuote = e.detail.text;
+                this.activeTab = 'comments';
+                setTimeout(() => document.getElementById('comment-input')?.focus(), 100);
+            });
+
+            window.addEventListener('scroll-to-anchor', (e) => {
+                this.scrollToAnchor(e.detail);
+            });
         },
 
         async saveContent(showAlertAndReload = true) {
@@ -335,8 +408,31 @@ function editorPage() {
                 body: JSON.stringify({content})
             });
             if (res.ok && showAlertAndReload) {
-                alert('Disimpan!');
-                window.location.reload();
+                // Ubah tampilan tombol simpan sementara (toast effect)
+                const saveBtn = document.querySelector('button[\\@click="saveContent()"]');
+                if (saveBtn) {
+                    const oldHtml = saveBtn.innerHTML;
+                    saveBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Tersimpan';
+                    saveBtn.classList.add('text-green-600');
+                    setTimeout(() => {
+                        saveBtn.innerHTML = oldHtml;
+                        saveBtn.classList.remove('text-green-600');
+                    }, 2000);
+                }
+                
+                // Tambahkan log riwayat secara dinamis tanpa refresh
+                const user_name = @json(Auth::user()->name);
+                const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
+                if(historyContainer) {
+                    const hHtml = `
+                    <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
+                        <div class="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                        <div class="text-xs text-slate-400 mb-1">Baru saja</div>
+                        <div class="text-sm font-medium text-slate-800">${user_name}</div>
+                        <div class="text-xs text-slate-600 mt-1">Konten diperbarui</div>
+                    </div>`;
+                    historyContainer.insertAdjacentHTML('afterbegin', hHtml);
+                }
             }
         },
 
@@ -355,16 +451,150 @@ function editorPage() {
             }
         },
 
+        async rejectDocument() {
+            if(!confirm('Apakah Anda yakin ingin menolak dokumen ini? Dokumen akan dikembalikan ke Draft/Client dan tanda tangan direset.')) return;
+            const res = await fetch(`/documents/${this.docId}/reject`, {
+                method: 'POST',
+                headers: {'X-CSRF-TOKEN':this.csrfToken}
+            });
+            if (res.ok) {
+                window.location.href = '{{ route("documents.index") }}';
+            }
+        },
+
+        scrollToAnchor(anchorId) {
+            if (!anchorId) return;
+            const editor = tinymce.get('editor-area');
+            const el = editor.getWin().document.getElementById(anchorId);
+            if (el) {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                // blink effect
+                const oldBg = el.style.backgroundColor;
+                el.style.backgroundColor = '#fca5a5'; // red-300
+                setTimeout(() => el.style.backgroundColor = oldBg, 1500);
+            }
+        },
+
         async postComment() {
             const input = document.getElementById('comment-input');
             const text = input.value;
             if (!text) return;
+
+            // Pastikan jika ada highlight (anchor) kuning baru, itu di-save dulu
+            if (this.activeCommentAnchor) {
+                await this.saveContent(false);
+            }
+
+            const currentQuote = this.activeCommentQuote;
+            const currentAnchor = this.activeCommentAnchor;
+
             const res = await fetch(`/documents/${this.docId}/comments`, {
                 method: 'POST',
                 headers: {'Content-Type':'application/json','X-CSRF-TOKEN':this.csrfToken},
-                body: JSON.stringify({text})
+                body: JSON.stringify({
+                    text: text,
+                    quote: currentQuote,
+                    anchor_id: currentAnchor
+                })
             });
-            if (res.ok) { input.value = ''; window.location.reload(); }
+            if (res.ok) { 
+                const data = await res.json();
+                input.value = ''; 
+                this.activeCommentAnchor = null;
+                this.activeCommentQuote = null;
+                
+                const user_name = @json(Auth::user()->name);
+                const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user_name)}&background=0D8ABC&color=fff`;
+                
+                let quoteHtml = '';
+                if (currentQuote) {
+                    quoteHtml = `<div class="mb-2 pl-2 border-l-2 border-yellow-400 bg-yellow-50 text-xs text-slate-600 italic py-1">"${currentQuote}"</div>`;
+                }
+                
+                const newHtml = `
+                    <div class="comment-block bg-slate-50 rounded-lg p-3 border border-slate-200 cursor-pointer hover:bg-slate-100 transition" onclick="window.dispatchEvent(new CustomEvent('scroll-to-anchor', {detail: '${currentAnchor || ''}'}))">
+                        <div class="flex items-start gap-2 mb-2">
+                            <img src="${avatar}" class="w-6 h-6 rounded-full mt-0.5" alt="">
+                            <div class="flex-1">
+                                <div class="flex items-center justify-between mb-1">
+                                    <div class="text-xs font-semibold text-slate-700">${user_name}</div>
+                                    <button onclick="event.stopPropagation(); document.querySelector('[x-data]').__x.$data.resolveComment(${data.comment.id}, '${currentAnchor}', this.closest('.comment-block'))" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-200 hover:bg-green-500 hover:text-white text-slate-600 transition ml-2"><i class="fa-solid fa-check mr-1"></i>Selesaikan</button>
+                                </div>
+                                <div class="text-xs text-slate-400">Baru saja</div>
+                            </div>
+                        </div>
+                        ${quoteHtml}
+                        <div class="text-sm text-slate-700 whitespace-pre-wrap">${text}</div>
+                    </div>
+                `;
+                
+                const container = document.querySelector(`[x-show="activeTab==='comments'"] .overflow-y-auto`);
+                if(container) {
+                    const emptyMsg = container.querySelector('.text-center');
+                    if(emptyMsg) emptyMsg.remove();
+                    container.insertAdjacentHTML('afterbegin', newHtml);
+                }
+                
+                const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
+                if(historyContainer) {
+                    const hHtml = `
+                    <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
+                        <div class="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                        <div class="text-xs text-slate-400 mb-1">Baru saja</div>
+                        <div class="text-sm font-medium text-slate-800">${user_name}</div>
+                        <div class="text-xs text-slate-600 mt-1">Menambahkan komentar</div>
+                    </div>`;
+                    historyContainer.insertAdjacentHTML('afterbegin', hHtml);
+                }
+            }
+        },
+
+        async resolveComment(commentId, anchorId, el) {
+            if(!confirm('Tandai komentar ini sebagai selesai? Highlight warna kuning di dokumen akan otomatis dihapus.')) return;
+            const res = await fetch(`/documents/${this.docId}/comments/${commentId}/resolve`, {
+                method: 'POST',
+                headers: {'X-CSRF-TOKEN':this.csrfToken}
+            });
+            if (res.ok) {
+                // Update UI button to badge
+                if (el) {
+                    const btn = el.querySelector('button');
+                    if (btn) {
+                        const badge = document.createElement('span');
+                        badge.className = 'text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-2';
+                        badge.innerHTML = '<i class="fa-solid fa-check mr-1"></i>Selesai';
+                        btn.replaceWith(badge);
+                    }
+                    el.classList.add('opacity-60');
+                }
+
+                // Unwrap span in editor if anchor exists
+                if (anchorId) {
+                    const editor = tinymce.get('editor-area');
+                    const span = editor.getWin().document.getElementById(anchorId);
+                    if (span) {
+                        const textContent = span.innerHTML;
+                        span.insertAdjacentHTML('beforebegin', textContent);
+                        span.remove();
+                        // Autosave content silently
+                        this.saveContent(false);
+                    }
+                }
+
+                // Add to history
+                const user_name = @json(Auth::user()->name);
+                const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
+                if(historyContainer) {
+                    const hHtml = `
+                    <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
+                        <div class="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                        <div class="text-xs text-slate-400 mb-1">Baru saja</div>
+                        <div class="text-sm font-medium text-slate-800">${user_name}</div>
+                        <div class="text-xs text-slate-600 mt-1">Menyelesaikan komentar</div>
+                    </div>`;
+                    historyContainer.insertAdjacentHTML('afterbegin', hHtml);
+                }
+            }
         },
 
         previewSignature(event) {
@@ -412,9 +642,21 @@ function editorPage() {
             alert('Sedang menyiapkan PDF, mohon tunggu sebentar...');
             const content = tinymce.get('editor-area').getContent();
             const el = document.createElement('div');
-            el.style.padding = '40px';
-            el.style.fontFamily = 'Times New Roman, serif';
+            // Menyamakan style font dengan editor TinyMCE
+            el.style.fontFamily = 'Tahoma, "Times New Roman", Times, serif';
+            el.style.fontSize = '11pt';
+            el.style.lineHeight = '1.5';
+            el.style.color = '#000000';
             el.innerHTML = content;
+
+            // MENGHAPUS HIGHLIGHT KUNING: 
+            // Kita cari semua elemen <span> yang punya data-comment-id dan kita "unwrap" isinya
+            const marks = el.querySelectorAll('span[data-comment-id]');
+            marks.forEach(span => {
+                const textContent = span.innerHTML;
+                span.insertAdjacentHTML('beforebegin', textContent);
+                span.remove();
+            });
 
             // Menggunakan path relatif (/storage/...) agar html2canvas tidak terblokir CORS
             const parties = @json($doc->parties->map(fn($p) => ['name'=>$p->user->name,'role'=>$p->role_type,'sig'=>$p->signature_path ? '/storage/' . $p->signature_path : null]));
@@ -430,7 +672,7 @@ function editorPage() {
             el.insertAdjacentHTML('beforeend', sigBlock);
 
             html2pdf().set({
-                margin: 1,
+                margin: 0.75, // Margin 0.75 inci untuk seluruh sisi (kiri, kanan, atas, bawah)
                 filename: '{{ $doc->title }}.pdf',
                 image: {type:'jpeg',quality:0.98},
                 html2canvas: {

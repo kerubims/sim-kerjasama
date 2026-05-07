@@ -11,6 +11,8 @@ class DocumentComment extends Model
         'user_id',
         'text',
         'quoted_text',
+        'anchor_id',
+        'is_resolved',
     ];
 
     public function document()
