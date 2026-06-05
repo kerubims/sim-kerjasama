@@ -15,6 +15,7 @@ class Document extends Model
         'document_number',
         'title',
         'content',
+        'file_path',
         'start_date',
         'end_date',
         'status',

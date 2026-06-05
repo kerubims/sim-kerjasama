@@ -44,7 +44,7 @@
                 <i class="fa-solid fa-arrow-left"></i>
             </a>
             <div>
-                <h1 class="text-lg font-bold text-slate-900">{{ $doc->title }}</h1>
+                <h1 class="text-lg font-bold text-slate-900">{{ $doc->document_number ? $doc->document_number . ' - ' : '' }}{{ $doc->title }}</h1>
                 <div class="flex items-center gap-2 text-xs text-slate-500">
                     <span class="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
                         {{ $statusLabel }}
@@ -91,18 +91,89 @@
             @endif
 
             @if($doc->status === 'signed')
-            <button @click="exportPdf()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm ml-2 transition">
-                <i class="fa-solid fa-file-pdf mr-1"></i> Export PDF
-            </button>
+                @if($doc->file_path)
+                <a href="{{ route('documents.preview', ['id' => $doc->id]) }}" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm ml-2 transition inline-flex items-center">
+                    <i class="fa-solid fa-file-pdf mr-1"></i> Download PDF
+                </a>
+                @else
+                <button @click="exportPdf()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm ml-2 transition">
+                    <i class="fa-solid fa-file-pdf mr-1"></i> Export PDF
+                </button>
+                @endif
             @endif
         </div>
     </header>
 
     <!-- Main Editor Area -->
     <div class="flex-1 flex overflow-hidden">
-        <!-- WYSIWYG Container -->
-        <div class="flex-1 flex flex-col bg-slate-100 border-none">
-            <textarea id="editor-area" class="w-full h-full opacity-0 border-none">{!! $doc->content !!}</textarea>
+        <!-- WYSIWYG / PDF Container -->
+        <div class="flex-1 flex flex-col bg-slate-100 border-none relative overflow-hidden">
+            @if($doc->file_path)
+                @php $pdfUrl = route('documents.preview', ['id' => $doc->id]); @endphp
+                {{-- PDF Toolbar --}}
+                <div class="flex items-center justify-between px-4 py-2 bg-slate-800 text-white shrink-0">
+                    <div class="flex items-center gap-2 text-sm">
+                        <i class="fa-solid fa-file-pdf text-red-400"></i>
+                        <span class="text-slate-300 text-xs">Dokumen PDF — ditandatangani offline</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <a href="{{ $pdfUrl }}" target="_blank"
+                           class="text-xs px-3 py-1.5 bg-slate-700 hover:bg-slate-600 rounded-md transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i> Buka di Tab Baru
+                        </a>
+                        <a href="{{ $pdfUrl }}" download
+                           class="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-md transition flex items-center gap-1.5">
+                            <i class="fa-solid fa-download text-[11px]"></i> Download
+                        </a>
+                    </div>
+                </div>
+                {{-- PDF Iframe Viewer --}}
+                <iframe
+                    id="pdf-viewer-iframe"
+                    src="{{ $pdfUrl }}#toolbar=1&navpanes=0&scrollbar=1&view=FitH"
+                    class="w-full border-none bg-white"
+                    style="flex: 1 1 0%; min-height: 0; height: 100%;"
+                    loading="lazy"
+                    title="PDF Viewer">
+                </iframe>
+                {{-- Fallback for browsers that block inline PDF --}}
+                <div id="pdf-fallback" class="hidden absolute inset-0 flex flex-col items-center justify-center bg-white text-center p-8">
+                    <div class="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-file-pdf text-2xl"></i>
+                    </div>
+                    <h3 class="font-semibold text-slate-800 mb-2">Browser tidak dapat menampilkan PDF secara langsung</h3>
+                    <p class="text-sm text-slate-500 mb-5">Silakan gunakan salah satu tombol di bawah untuk melihat atau mengunduh dokumen.</p>
+                    <div class="flex gap-3">
+                        <a href="{{ $pdfUrl }}" target="_blank" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white text-sm rounded-lg font-medium transition">
+                            <i class="fa-solid fa-arrow-up-right-from-square mr-2"></i> Buka di Tab Baru
+                        </a>
+                        <a href="{{ $pdfUrl }}" download class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition">
+                            <i class="fa-solid fa-download mr-2"></i> Download PDF
+                        </a>
+                    </div>
+                </div>
+                <script>
+                    // Detect if iframe failed to load (e.g. browser blocks inline PDF)
+                    document.getElementById('pdf-viewer-iframe').addEventListener('load', function() {
+                        try {
+                            // If contentDocument is accessible but empty or errored, show fallback
+                            const doc = this.contentDocument || this.contentWindow.document;
+                            if (!doc || doc.body.innerHTML === '') {
+                                showPdfFallback();
+                            }
+                        } catch(e) {
+                            // Cross-origin or other error — PDF likely loaded fine in iframe, ignore
+                        }
+                    });
+                    document.getElementById('pdf-viewer-iframe').addEventListener('error', showPdfFallback);
+                    function showPdfFallback() {
+                        document.getElementById('pdf-viewer-iframe').classList.add('hidden');
+                        document.getElementById('pdf-fallback').classList.remove('hidden');
+                    }
+                </script>
+            @else
+                <textarea id="editor-area" class="w-full h-full opacity-0 border-none">{!! $doc->content !!}</textarea>
+            @endif
         </div>
 
         <!-- Sidebar -->
@@ -176,7 +247,11 @@
                     @foreach($doc->parties as $party)
                     <div class="border border-slate-200 rounded p-2 bg-white">
                         <div class="text-xs text-slate-400 mb-1">{{ $party->user->name }} ({{ $party->role_type === 'client' ? 'Client' : 'Unit Pengusul' }})</div>
-                        @if($party->signature_path)
+                        @if($party->signature_path === 'offline_signed')
+                        <div class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 inline-block mt-1">
+                            <i class="fa-solid fa-file-signature mr-1"></i> Ditandatangani Offline
+                        </div>
+                        @elseif($party->signature_path)
                         <img src="{{ Storage::url($party->signature_path) }}" class="h-12" alt="Signature">
                         @else
                         <div class="text-xs text-slate-300 italic">Belum ditandatangani</div>

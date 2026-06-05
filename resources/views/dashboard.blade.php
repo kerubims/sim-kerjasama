@@ -25,68 +25,76 @@
 <!-- Stats Cards (Admin Only) -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
     <!-- Total Mitra -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-        <div class="flex justify-between items-start mb-4">
-            <div>
-                <div class="text-sm text-slate-500 font-medium">Total Mitra</div>
-                <div class="text-3xl font-bold text-slate-900 mt-1">{{ number_format($stats['total_mitra']) }}</div>
+    <a href="{{ route('users.index') }}" class="block">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow h-full">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <div class="text-sm text-slate-500 font-medium">Total Mitra</div>
+                    <div class="text-3xl font-bold text-slate-900 mt-1">{{ number_format($stats['total_mitra']) }}</div>
+                </div>
+                <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
+                    <i class="fa-solid fa-building-columns"></i>
+                </div>
             </div>
-            <div class="w-10 h-10 bg-blue-50 rounded-lg flex items-center justify-center text-blue-600">
-                <i class="fa-solid fa-building-columns"></i>
+            <div class="text-xs font-medium text-slate-500">
+                Total mitra terdaftar
             </div>
         </div>
-        <div class="text-xs font-medium text-slate-500">
-            Total mitra terdaftar
-        </div>
-    </div>
+    </a>
 
     <!-- Dokumen Aktif -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-        <div class="flex justify-between items-start mb-4">
-            <div>
-                <div class="text-sm text-slate-500 font-medium">Dokumen Aktif</div>
-                <div class="text-3xl font-bold text-slate-900 mt-1">{{ $stats['active'] }}</div>
+    <a href="{{ route('documents.index', ['status' => 'signed']) }}" class="block">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow h-full">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <div class="text-sm text-slate-500 font-medium">Dokumen Aktif</div>
+                    <div class="text-3xl font-bold text-slate-900 mt-1">{{ $stats['active'] }}</div>
+                </div>
+                <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center text-green-600">
+                    <i class="fa-solid fa-file-circle-check"></i>
+                </div>
             </div>
-            <div class="w-10 h-10 bg-green-50 rounded-lg flex items-center justify-center text-green-600">
-                <i class="fa-solid fa-file-circle-check"></i>
+            <div class="text-xs font-medium text-slate-500">
+                Dokumen status "Signed"
             </div>
         </div>
-        <div class="text-xs font-medium text-slate-500">
-            Dokumen status "Signed"
-        </div>
-    </div>
+    </a>
 
     <!-- Masa Tenggang -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-        <div class="flex justify-between items-start mb-4">
-            <div>
-                <div class="text-sm text-slate-500 font-medium">Masa Tenggang</div>
-                <div class="text-3xl font-bold text-slate-900 mt-1">{{ $stats['expiring'] }}</div>
+    <a href="{{ route('documents.index', ['status' => 'expiring']) }}" class="block">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow h-full">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <div class="text-sm text-slate-500 font-medium">Masa Tenggang</div>
+                    <div class="text-3xl font-bold text-slate-900 mt-1">{{ $stats['expiring'] }}</div>
+                </div>
+                <div class="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center text-yellow-600">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
             </div>
-            <div class="w-10 h-10 bg-yellow-50 rounded-lg flex items-center justify-center text-yellow-600">
-                <i class="fa-solid fa-triangle-exclamation"></i>
+            <div class="text-xs font-medium text-yellow-600">
+                Expiring < 30 days
             </div>
         </div>
-        <div class="text-xs font-medium text-yellow-600">
-            Expiring < 30 days
-        </div>
-    </div>
+    </a>
 
     <!-- Kedaluwarsa -->
-    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
-        <div class="flex justify-between items-start mb-4">
-            <div>
-                <div class="text-sm text-slate-500 font-medium">Kedaluwarsa</div>
-                <div class="text-3xl font-bold text-slate-900 mt-1">{{ $stats['expired'] }}</div>
+    <a href="{{ route('documents.index', ['status' => 'kadaluarsa']) }}" class="block">
+        <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow h-full">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <div class="text-sm text-slate-500 font-medium">Kedaluwarsa</div>
+                    <div class="text-3xl font-bold text-slate-900 mt-1">{{ $stats['expired'] }}</div>
+                </div>
+                <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center text-red-600">
+                    <i class="fa-solid fa-file-circle-xmark"></i>
+                </div>
             </div>
-            <div class="w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center text-red-600">
-                <i class="fa-solid fa-file-circle-xmark"></i>
+            <div class="text-xs font-medium text-red-600">
+                Perlu tindak lanjut
             </div>
         </div>
-        <div class="text-xs font-medium text-red-600">
-            Perlu tindak lanjut
-        </div>
-    </div>
+    </a>
 </div>
 
 <!-- Charts Section (Admin Only) -->
@@ -157,7 +165,7 @@
                         @endif
                         {{ $doc->title }}
                         @if($doc->parent_id)
-                            <div class="text-xs text-slate-500 mt-1">Rujukan: {{ $doc->parent->title ?? '' }}</div>
+                            <div class="text-xs text-slate-500 mt-1">Rujukan: {{ $doc->parent->document_number ?? $doc->parent->title ?? '' }}</div>
                         @endif
                     </td>
                     <td class="px-6 py-4">

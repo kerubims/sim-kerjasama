@@ -15,11 +15,55 @@ use Illuminate\Support\Str;
 
 class DocumentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
         
         $query = Document::with(['parent', 'parties.user'])->orderBy('created_at', 'desc');
+        
+        if ($request->filled('q')) {
+            $query->where(function ($q) use ($request) {
+                $q->where('title', 'like', '%' . $request->q . '%')
+                  ->orWhere('document_number', 'like', '%' . $request->q . '%');
+            });
+        }
+
+        if ($request->filled('type')) {
+            $query->where('type', $request->type);
+        }
+
+        if ($request->filled('status')) {
+            if ($request->status === 'kadaluarsa') {
+                $query->whereNotNull('end_date')->where('end_date', '<', now());
+            } elseif ($request->status === 'expiring') {
+                $query->where('status', 'signed')
+                      ->whereNotNull('end_date')
+                      ->where('end_date', '<', now()->addDays(30))
+                      ->where('end_date', '>', now());
+            } else {
+                $query->where('status', $request->status);
+            }
+        }
+
+        if ($request->filled('unit')) {
+            $query->whereHas('parties', function ($q) use ($request) {
+                $q->where('user_id', $request->unit)->where('role_type', 'unit_pengusul');
+            });
+        }
+
+        if ($request->filled('client')) {
+            $query->whereHas('parties', function ($q) use ($request) {
+                $q->where('user_id', $request->client)->where('role_type', 'client');
+            });
+        }
+
+        if ($request->filled('created_from')) {
+            $query->whereDate('created_at', '>=', $request->created_from);
+        }
+
+        if ($request->filled('created_to')) {
+            $query->whereDate('created_at', '<=', $request->created_to);
+        }
         
         // Filter berdasarkan role
         if ($user->hasRole('super_admin')) {
@@ -48,15 +92,48 @@ class DocumentController extends Controller
 
     public function store(Request $request)
     {
+        $messages = [
+            'title.required' => 'Judul kerjasama wajib diisi.',
+            'title.max' => 'Judul kerjasama maksimal 255 karakter.',
+            'document_number.unique' => 'Nomor dokumen sudah digunakan. Silakan gunakan nomor yang lain.',
+            'document_number.max' => 'Nomor dokumen maksimal 255 karakter.',
+            'type.required' => 'Jenis dokumen wajib dipilih.',
+            'type.in' => 'Jenis dokumen tidak valid.',
+            'start_date.required' => 'Tanggal mulai wajib diisi.',
+            'start_date.date' => 'Format tanggal mulai tidak valid.',
+            'end_date.required' => 'Tanggal selesai wajib diisi.',
+            'end_date.date' => 'Format tanggal selesai tidak valid.',
+            'end_date.after' => 'Tanggal selesai harus setelah tanggal mulai.',
+            'parties.required' => 'Pihak kerjasama wajib dipilih.',
+            'parties.min' => 'Minimal harus memilih 2 pihak.',
+            'parties.*.required' => 'Data pihak kerjasama tidak valid.',
+            'parties.*.exists' => 'Pihak yang dipilih tidak terdaftar di sistem.',
+            'parent_id.exists' => 'Dokumen rujukan tidak ditemukan.',
+            'final_pdf.required_if' => 'File dokumen PDF wajib diunggah.',
+            'final_pdf.file' => 'Data yang diunggah harus berupa file.',
+            'final_pdf.mimes' => 'Dokumen yang diunggah harus berformat PDF.',
+            'final_pdf.max' => 'Ukuran file PDF maksimal adalah 10MB.',
+            'submission_type.required' => 'Tipe pengiriman dokumen tidak valid.',
+            'submission_type.in' => 'Tipe pengiriman dokumen tidak dikenali.',
+        ];
+
         $request->validate([
             'title' => 'required|string|max:255',
+            'document_number' => 'nullable|string|max:255|unique:documents,document_number',
             'type' => 'required|in:mou,moa,ia',
             'start_date' => 'required|date',
             'end_date' => 'required|date|after:start_date',
             'parties' => 'required|array|min:2',
             'parties.*' => 'required|exists:users,id',
-            'parent_id' => 'nullable|exists:documents,id'
-        ]);
+            'parent_id' => 'nullable|exists:documents,id',
+            'submission_type' => 'required|in:draft,upload',
+            'final_pdf' => 'required_if:submission_type,upload|file|mimes:pdf|max:10240',
+        ], $messages);
+
+        $filePath = null;
+        if ($request->submission_type === 'upload' && $request->hasFile('final_pdf')) {
+            $filePath = $request->file('final_pdf')->store('documents/final', 'public');
+        }
 
         $document = Document::create([
             'title' => $request->title,
@@ -64,11 +141,12 @@ class DocumentController extends Controller
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'parent_id' => $request->parent_id,
-            'status' => 'draft',
+            'status' => $request->submission_type === 'upload' ? 'signed' : 'draft',
+            'file_path' => $filePath,
             'allow_client_upload' => false,
             'created_by' => Auth::id(),
-            'document_number' => 'DOC-' . date('Ymd') . '-' . rand(1000, 9999),
-            'content' => '<h1>Perjanjian Kerjasama</h1><p>Silakan edit isi perjanjian ini...</p>'
+            'document_number' => $request->document_number ?: ('DOC-' . date('Ymd') . '-' . rand(1000, 9999)),
+            'content' => $request->submission_type === 'upload' ? '<h1>Dokumen Eksternal</h1><p>Dokumen ini ditandatangani secara offline. Silakan lihat lampiran PDF.</p>' : '<h1>Perjanjian Kerjasama</h1><p>Silakan edit isi perjanjian ini...</p>'
         ]);
 
         // Get unique users to avoid SQL unique constraint violations
@@ -83,28 +161,36 @@ class DocumentController extends Controller
                 DocumentParty::create([
                     'document_id' => $document->id,
                     'user_id' => $user->id,
-                    'role_type' => $roleType
+                    'role_type' => $roleType,
+                    'signature_path' => $request->submission_type === 'upload' ? 'offline_signed' : null,
+                    'signed_at' => $request->submission_type === 'upload' ? now() : null,
                 ]);
             }
         }
 
+        $action = $request->submission_type === 'upload' ? 'Uploaded' : 'Created';
+        $message = $request->submission_type === 'upload' 
+            ? 'Dokumen ' . strtoupper($request->type) . ' (Final) diunggah dengan ' . count($uniqueParties) . ' pihak'
+            : 'Dokumen ' . strtoupper($request->type) . ' dibuat dengan ' . count($uniqueParties) . ' pihak';
+
         DocumentHistory::create([
             'document_id' => $document->id,
             'user_id' => Auth::id(),
-            'action' => 'Created',
-            'message' => 'Dokumen ' . strtoupper($request->type) . ' dibuat dengan ' . count($uniqueParties) . ' pihak'
+            'action' => $action,
+            'message' => $message
         ]);
 
         // Notify all parties
         $partyUsers = User::whereIn('id', $uniqueParties)->where('id', '!=', Auth::id())->get();
         Notification::send($partyUsers, new DocumentNotification(
-            'Dokumen Baru',
+            $request->submission_type === 'upload' ? 'Dokumen Final Tersedia' : 'Dokumen Baru',
             'Anda ditambahkan sebagai pihak dalam dokumen "' . Str::limit($document->title, 40) . '"',
             'fa-file-circle-plus',
             route('documents.editor', $document->id)
         ));
 
-        return redirect()->route('documents.editor', $document->id)->with('success', 'Dokumen berhasil dibuat');
+        $successMsg = $request->submission_type === 'upload' ? 'Dokumen final berhasil diunggah dan status menjadi aktif' : 'Dokumen berhasil dibuat';
+        return redirect()->route('documents.editor', $document->id)->with('success', $successMsg);
     }
 
     public function editor($id)
@@ -133,6 +219,32 @@ class DocumentController extends Controller
         }
 
         return view('documents.editor', ['doc' => $document]);
+    }
+
+    public function preview($id)
+    {
+        $document = Document::findOrFail($id);
+        $user = Auth::user();
+
+        // Access control
+        if (!$user->hasRole('super_admin')) {
+            $isParty = $document->parties()->where('user_id', $user->id)->exists();
+            if (!$isParty) {
+                abort(403, 'Anda bukan pihak yang terlibat dalam dokumen ini.');
+            }
+
+            if ($user->hasRole('client')) {
+                if ($document->status === 'draft') {
+                    abort(403, 'Anda belum memiliki akses ke dokumen ini.');
+                }
+            }
+        }
+
+        if ($document->file_path && \Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+            return response()->file(storage_path('app/public/' . $document->file_path));
+        }
+
+        abort(404, 'File dokumen tidak ditemukan.');
     }
 
     public function updateContent(Request $request, $id)
@@ -168,6 +280,41 @@ class DocumentController extends Controller
         ]);
 
         return response()->json(['success' => true]);
+    }
+
+    public function updateDates(Request $request, $id)
+    {
+        $request->validate([
+            'start_date' => 'required|date',
+            'end_date'   => 'required|date|after:start_date',
+        ], [
+            'start_date.required' => 'Tanggal mulai wajib diisi.',
+            'start_date.date'     => 'Format tanggal mulai tidak valid.',
+            'end_date.required'   => 'Tanggal selesai wajib diisi.',
+            'end_date.date'       => 'Format tanggal selesai tidak valid.',
+            'end_date.after'      => 'Tanggal selesai harus setelah tanggal mulai.',
+        ]);
+
+        $document = Document::findOrFail($id);
+
+        $oldStart = \Carbon\Carbon::parse($document->start_date)->format('d M Y');
+        $oldEnd   = \Carbon\Carbon::parse($document->end_date)->format('d M Y');
+        $newStart = \Carbon\Carbon::parse($request->start_date)->format('d M Y');
+        $newEnd   = \Carbon\Carbon::parse($request->end_date)->format('d M Y');
+
+        $document->update([
+            'start_date' => $request->start_date,
+            'end_date'   => $request->end_date,
+        ]);
+
+        DocumentHistory::create([
+            'document_id' => $document->id,
+            'user_id'     => Auth::id(),
+            'action'      => 'Date Update',
+            'message'     => "Tanggal diperbarui: {$oldStart}–{$oldEnd} → {$newStart}–{$newEnd}",
+        ]);
+
+        return response()->json(['success' => true, 'message' => 'Tanggal dokumen berhasil diperbarui.']);
     }
 
     public function updateStatus(Request $request, $id)

@@ -30,6 +30,7 @@ Route::middleware(['auth'])->group(function () {
     // Documents (Super Admin only)
     Route::middleware(['role:super_admin'])->group(function () {
         Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
+        Route::put('/documents/{id}/dates', [DocumentController::class, 'updateDates'])->name('documents.updateDates');
 
         Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking.index');
 
@@ -47,6 +48,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/documents/search', [DocumentController::class, 'search'])->name('documents.search');
 
     Route::get('/documents/{id}/editor', [DocumentController::class, 'editor'])->name('documents.editor');
+    Route::get('/documents/{id}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::put('/documents/{id}/content', [DocumentController::class, 'updateContent'])->name('documents.updateContent');
     Route::put('/documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
     Route::post('/documents/{id}/comments', [DocumentController::class, 'storeComment'])->name('documents.comments.store');
