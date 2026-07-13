@@ -56,19 +56,25 @@
                 $statusLabel = match($mou->status) {
                     'signed' => 'Aktif',
                     'draft' => 'Draft',
-                    'review_client' => 'Review Client',
+                    'review_client' => 'Review Mitra',
                     'review_unit' => 'Review Unit',
                     default => ucfirst($mou->status),
                 };
                 $clientName = $mou->parties->where('role_type', 'client')->first()?->user?->name ?? '-';
                 $unitName = $mou->parties->where('role_type', 'unit_pengusul')->first()?->user?->name ?? '-';
+                $rootUi = match($mou->type) {
+                    'mou' => ['bg' => 'bg-blue-50', 'iconBg' => 'bg-blue-600', 'icon' => 'fa-handshake'],
+                    'moa' => ['bg' => 'bg-purple-50', 'iconBg' => 'bg-purple-500', 'icon' => 'fa-file-signature'],
+                    'ia' => ['bg' => 'bg-teal-50', 'iconBg' => 'bg-teal-500', 'icon' => 'fa-clipboard-check'],
+                    default => ['bg' => 'bg-slate-50', 'iconBg' => 'bg-slate-500', 'icon' => 'fa-file']
+                };
             @endphp
             <div class="border border-slate-200 rounded-xl overflow-hidden">
                 <!-- MoU Level -->
-                <div class="bg-blue-50 px-6 py-4 flex items-center gap-4 cursor-pointer" @click="openNodes['{{ $mouKey }}'] = !openNodes['{{ $mouKey }}']">
-                    <i class="fa-solid fa-chevron-down text-blue-600 transition-transform text-sm" :class="{ 'rotate-180': !openNodes['{{ $mouKey }}'] }"></i>
-                    <div class="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-                        <i class="fa-solid fa-handshake"></i>
+                <div class="{{ $rootUi['bg'] }} px-6 py-4 flex items-center gap-4 cursor-pointer" @click="openNodes['{{ $mouKey }}'] = !openNodes['{{ $mouKey }}']">
+                    <i class="fa-solid fa-chevron-down text-slate-400 transition-transform text-sm" :class="{ 'rotate-180': !openNodes['{{ $mouKey }}'] }"></i>
+                    <div class="w-10 h-10 {{ $rootUi['iconBg'] }} rounded-lg flex items-center justify-center text-white">
+                        <i class="fa-solid {{ $rootUi['icon'] }}"></i>
                     </div>
                     <div class="flex-1">
                         <div class="font-bold text-slate-900">{{ strtoupper($mou->type) }} — {{ $mou->title }}</div>
@@ -97,7 +103,7 @@
                         };
                         $moaStatusLabel = match($moa->status) {
                             'signed' => 'Aktif', 'draft' => 'Draft',
-                            'review_client' => 'Review Client', 'review_unit' => 'Review Unit',
+                            'review_client' => 'Review Mitra', 'review_unit' => 'Review Unit',
                             default => ucfirst($moa->status),
                         };
                         $moaClient = $moa->parties->where('role_type', 'client')->first()?->user?->name ?? '-';
@@ -129,7 +135,7 @@
                                 };
                                 $iaStatusLabel = match($ia->status) {
                                     'signed' => 'Aktif', 'draft' => 'Draft',
-                                    'review_client' => 'Review Client', 'review_unit' => 'Review Unit',
+                                    'review_client' => 'Review Mitra', 'review_unit' => 'Review Unit',
                                     default => ucfirst($ia->status),
                                 };
                             @endphp
@@ -170,7 +176,7 @@
         <p class="text-slate-500 text-sm mt-2">Tidak ada dokumen yang cocok dengan pencarian "{{ $search }}".</p>
         @else
         <h3 class="font-bold text-slate-700 text-lg">Belum Ada Dokumen</h3>
-        <p class="text-slate-500 text-sm mt-2 max-w-md mx-auto">Buat dokumen MoU terlebih dahulu di halaman Dokumen Kerjasama untuk melihat hierarki di sini.</p>
+        <p class="text-slate-500 text-sm mt-2 max-w-md mx-auto">Buat dokumen kerjasama terlebih dahulu di halaman Dokumen Kerjasama untuk melihat hierarki di sini.</p>
         @endif
     </div>
     @endif

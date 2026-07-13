@@ -49,6 +49,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/documents/{id}/editor', [DocumentController::class, 'editor'])->name('documents.editor');
     Route::get('/documents/{id}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
+    Route::get('/documents/{id}/export-pdf', [DocumentController::class, 'exportPdf'])->name('documents.export-pdf');
     Route::put('/documents/{id}/content', [DocumentController::class, 'updateContent'])->name('documents.updateContent');
     Route::put('/documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
     Route::post('/documents/{id}/comments', [DocumentController::class, 'storeComment'])->name('documents.comments.store');

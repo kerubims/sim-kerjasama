@@ -86,8 +86,15 @@ class DocumentController extends Controller
 
         $clients = User::role('client')->get();
         $units = User::role('unit_pengusul')->get();
+
+        // Nomor dokumen terakhir per jenis
+        $lastDocNumbers = [
+            'mou' => Document::where('type', 'mou')->whereNotNull('document_number')->latest()->first()?->document_number,
+            'moa' => Document::where('type', 'moa')->whereNotNull('document_number')->latest()->first()?->document_number,
+            'ia'  => Document::where('type', 'ia')->whereNotNull('document_number')->latest()->first()?->document_number,
+        ];
         
-        return view('documents.index', compact('documents', 'clients', 'units', 'allDocs'));
+        return view('documents.index', compact('documents', 'clients', 'units', 'allDocs', 'lastDocNumbers'));
     }
 
     public function store(Request $request)
@@ -99,9 +106,7 @@ class DocumentController extends Controller
             'document_number.max' => 'Nomor dokumen maksimal 255 karakter.',
             'type.required' => 'Jenis dokumen wajib dipilih.',
             'type.in' => 'Jenis dokumen tidak valid.',
-            'start_date.required' => 'Tanggal mulai wajib diisi.',
             'start_date.date' => 'Format tanggal mulai tidak valid.',
-            'end_date.required' => 'Tanggal selesai wajib diisi.',
             'end_date.date' => 'Format tanggal selesai tidak valid.',
             'end_date.after' => 'Tanggal selesai harus setelah tanggal mulai.',
             'parties.required' => 'Pihak kerjasama wajib dipilih.',
@@ -121,14 +126,19 @@ class DocumentController extends Controller
             'title' => 'required|string|max:255',
             'document_number' => 'nullable|string|max:255|unique:documents,document_number',
             'type' => 'required|in:mou,moa,ia',
-            'start_date' => 'required|date',
-            'end_date' => 'required|date|after:start_date',
+            'start_date' => 'nullable|date',
+            'end_date' => 'nullable|date|after:start_date',
             'parties' => 'required|array|min:2',
             'parties.*' => 'required|exists:users,id',
             'parent_id' => 'nullable|exists:documents,id',
             'submission_type' => 'required|in:draft,upload',
             'final_pdf' => 'required_if:submission_type,upload|file|mimes:pdf|max:10240',
         ], $messages);
+
+        if ($request->submission_type === 'draft') {
+            // Document draft creation logic (pure local)
+            // No external API calls needed
+        }
 
         $filePath = null;
         if ($request->submission_type === 'upload' && $request->hasFile('final_pdf')) {
@@ -143,7 +153,7 @@ class DocumentController extends Controller
             'parent_id' => $request->parent_id,
             'status' => $request->submission_type === 'upload' ? 'signed' : 'draft',
             'file_path' => $filePath,
-            'allow_client_upload' => false,
+            'allow_client_upload' => $request->has('allow_client_upload'),
             'created_by' => Auth::id(),
             'document_number' => $request->document_number ?: ('DOC-' . date('Ymd') . '-' . rand(1000, 9999)),
             'content' => $request->submission_type === 'upload' ? '<h1>Dokumen Eksternal</h1><p>Dokumen ini ditandatangani secara offline. Silakan lihat lampiran PDF.</p>' : '<h1>Perjanjian Kerjasama</h1><p>Silakan edit isi perjanjian ini...</p>'
@@ -285,8 +295,9 @@ class DocumentController extends Controller
     public function updateDates(Request $request, $id)
     {
         $request->validate([
-            'start_date' => 'required|date',
-            'end_date'   => 'required|date|after:start_date',
+            'start_date'      => 'required|date',
+            'end_date'        => 'required|date|after:start_date',
+            'document_number' => 'nullable|string|max:255',
         ], [
             'start_date.required' => 'Tanggal mulai wajib diisi.',
             'start_date.date'     => 'Format tanggal mulai tidak valid.',
@@ -297,24 +308,39 @@ class DocumentController extends Controller
 
         $document = Document::findOrFail($id);
 
-        $oldStart = \Carbon\Carbon::parse($document->start_date)->format('d M Y');
-        $oldEnd   = \Carbon\Carbon::parse($document->end_date)->format('d M Y');
+        $oldStart = $document->start_date ? \Carbon\Carbon::parse($document->start_date)->format('d M Y') : '-';
+        $oldEnd   = $document->end_date ? \Carbon\Carbon::parse($document->end_date)->format('d M Y') : '-';
         $newStart = \Carbon\Carbon::parse($request->start_date)->format('d M Y');
         $newEnd   = \Carbon\Carbon::parse($request->end_date)->format('d M Y');
 
-        $document->update([
+        $updateData = [
             'start_date' => $request->start_date,
             'end_date'   => $request->end_date,
-        ]);
+        ];
+
+        $messages = [];
+        $messages[] = "Tanggal diperbarui: {$oldStart}–{$oldEnd} → {$newStart}–{$newEnd}";
+
+        if ($request->filled('document_number') && $request->document_number !== $document->document_number) {
+            $existing = Document::where('document_number', $request->document_number)->where('id', '!=', $document->id)->exists();
+            if ($existing) {
+                return response()->json(['success' => false, 'message' => 'Nomor dokumen sudah digunakan.'], 422);
+            }
+            $oldNum = $document->document_number ?? '-';
+            $updateData['document_number'] = $request->document_number;
+            $messages[] = "Nomor dokumen diperbarui: {$oldNum} → {$request->document_number}";
+        }
+
+        $document->update($updateData);
 
         DocumentHistory::create([
             'document_id' => $document->id,
             'user_id'     => Auth::id(),
             'action'      => 'Date Update',
-            'message'     => "Tanggal diperbarui: {$oldStart}–{$oldEnd} → {$newStart}–{$newEnd}",
+            'message'     => implode('. ', $messages),
         ]);
 
-        return response()->json(['success' => true, 'message' => 'Tanggal dokumen berhasil diperbarui.']);
+        return response()->json(['success' => true, 'message' => 'Data dokumen berhasil diperbarui.']);
     }
 
     public function updateStatus(Request $request, $id)
@@ -325,7 +351,7 @@ class DocumentController extends Controller
         
         $updateData = ['status' => $request->status];
 
-        // Save allow_client_upload when sending to client
+        // Save allow_client_upload when sending to mitra
         if ($request->status === 'review_client') {
             $updateData['allow_client_upload'] = $request->boolean('allowUpload', false);
         }
@@ -333,8 +359,10 @@ class DocumentController extends Controller
         $document->update($updateData);
 
         $message = 'Status berubah menjadi ' . $request->status;
-        if ($request->status === 'review_client') {
-            $message = 'Dikirim ke Client' . ($request->boolean('allowUpload') ? ' (dengan izin upload draft)' : '');
+        if ($request->status === 'review_unit') {
+            $message = 'Dikirim ke Unit Pengusul untuk review dan tanda tangan';
+        } elseif ($request->status === 'review_client') {
+            $message = 'Dikirim ke Mitra untuk review dan tanda tangan' . ($request->boolean('allowUpload') ? ' (dengan izin upload draft)' : '');
         }
 
         DocumentHistory::create([
@@ -346,20 +374,20 @@ class DocumentController extends Controller
 
         // Notify relevant parties based on new status
         $partyUsers = $document->parties()->with('user')->get()->pluck('user')->filter(fn($u) => $u->id !== Auth::id());
-        if ($request->status === 'review_client') {
-            $targets = $partyUsers->filter(fn($u) => $u->hasRole('client'));
-            Notification::send($targets, new DocumentNotification(
-                'Dokumen Siap Direview',
-                'Dokumen "' . Str::limit($document->title, 40) . '" telah dikirim untuk ditinjau.',
-                'fa-file-pen',
-                route('documents.editor', $document->id)
-            ));
-        } elseif ($request->status === 'review_unit') {
+        if ($request->status === 'review_unit') {
             $targets = $partyUsers->filter(fn($u) => $u->hasRole('unit_pengusul'));
             Notification::send($targets, new DocumentNotification(
                 'Dokumen Siap Ditinjau',
                 'Dokumen "' . Str::limit($document->title, 40) . '" menunggu peninjauan dan tanda tangan Anda.',
                 'fa-clipboard-check',
+                route('documents.editor', $document->id)
+            ));
+        } elseif ($request->status === 'review_client') {
+            $targets = $partyUsers->filter(fn($u) => $u->hasRole('client'));
+            Notification::send($targets, new DocumentNotification(
+                'Dokumen Siap Direview',
+                'Dokumen "' . Str::limit($document->title, 40) . '" telah dikirim untuk ditinjau.',
+                'fa-file-pen',
                 route('documents.editor', $document->id)
             ));
         }
@@ -431,15 +459,21 @@ class DocumentController extends Controller
         $document = Document::findOrFail($id);
         $user = Auth::user();
         
-        if (!$user->hasRole('unit_pengusul') && !$user->hasRole('super_admin')) {
+        if (!$user->hasRole('unit_pengusul') && !$user->hasRole('client') && !$user->hasRole('super_admin')) {
             abort(403);
         }
 
-        // Return to review_client so admin/client can fix, and wipe signatures
-        $document->update(['status' => 'review_client']);
+        // Tentukan status kembalian: jika klien menolak, kembalikan ke review_unit (Unit Pengusul)
+        $newStatus = 'draft';
+        if ($user->hasRole('client')) {
+            $newStatus = 'review_unit';
+        }
+
+        $document->update(['status' => $newStatus]);
         
         DocumentParty::where('document_id', $document->id)->update([
             'signature_path' => null,
+            'stamp_path' => null,
             'signed_at' => null
         ]);
 
@@ -475,6 +509,7 @@ class DocumentController extends Controller
     {
         $request->validate([
             'signature_file' => 'required|image|max:2048',
+            'stamp_file' => 'nullable|image|max:2048',
         ]);
 
         $document = Document::findOrFail($id);
@@ -496,54 +531,73 @@ class DocumentController extends Controller
         if ($request->hasFile('signature_file')) {
             $path = $request->file('signature_file')->store('signatures', 'public');
 
-            $party->update([
+            $updateData = [
                 'signature_path' => $path,
                 'signed_at' => now()
-            ]);
+            ];
 
-            // Cek status role
-            if ($user->hasRole('client')) {
-                // Cek apakah SEMUA client sudah tanda tangan
-                $unsignedClients = DocumentParty::where('document_id', $document->id)
-                                                ->where('role_type', 'client')
-                                                ->whereNull('signature_path')
-                                                ->count();
-                if ($unsignedClients === 0) {
-                    $document->update(['status' => 'review_unit']);
-                    DocumentHistory::create([
-                        'document_id' => $document->id,
-                        'user_id' => $userId,
-                        'action' => 'Status Change',
-                        'message' => 'Semua Client telah menandatangani, status menjadi REVIEW UNIT'
-                    ]);
-                } else {
-                    DocumentHistory::create([
-                        'document_id' => $document->id,
-                        'user_id' => $userId,
-                        'action' => 'Signed',
-                        'message' => 'Menandatangani dokumen (Menunggu ' . $unsignedClients . ' client lain)'
-                    ]);
-                }
-            } elseif ($user->hasRole('unit_pengusul')) {
+            // Upload stempel keabsahan jika ada
+            if ($request->hasFile('stamp_file')) {
+                $stampPath = $request->file('stamp_file')->store('stamps', 'public');
+                $updateData['stamp_path'] = $stampPath;
+            }
+
+            $party->update($updateData);
+
+            // Alur baru: Unit Pengusul tanda tangan dulu → Mitra
+            if ($user->hasRole('unit_pengusul')) {
                 // Cek apakah SEMUA unit pengusul sudah tanda tangan
                 $unsignedUnits = DocumentParty::where('document_id', $document->id)
                                                 ->where('role_type', 'unit_pengusul')
                                                 ->whereNull('signature_path')
                                                 ->count();
                 if ($unsignedUnits === 0) {
-                    $document->update(['status' => 'signed']);
+                    // Semua unit sudah tanda tangan → kirim ke Mitra
+                    $document->update(['status' => 'review_client']);
                     DocumentHistory::create([
                         'document_id' => $document->id,
                         'user_id' => $userId,
                         'action' => 'Status Change',
-                        'message' => 'Semua Unit Pengusul telah menandatangani, dokumen AKTIF'
+                        'message' => 'Semua Unit Pengusul telah menandatangani, dikirim ke Mitra untuk review'
                     ]);
+
+                    // Notify mitra
+                    $mitraUsers = $document->parties()->with('user')->where('role_type', 'client')->get()->pluck('user');
+                    Notification::send($mitraUsers, new DocumentNotification(
+                        'Dokumen Siap Direview',
+                        'Dokumen "' . Str::limit($document->title, 40) . '" telah dikirim untuk ditinjau dan ditandatangani.',
+                        'fa-file-pen',
+                        route('documents.editor', $document->id)
+                    ));
                 } else {
                     DocumentHistory::create([
                         'document_id' => $document->id,
                         'user_id' => $userId,
                         'action' => 'Signed',
                         'message' => 'Menandatangani dokumen (Menunggu ' . $unsignedUnits . ' unit lain)'
+                    ]);
+                }
+            } elseif ($user->hasRole('client')) {
+                // Cek apakah SEMUA mitra sudah tanda tangan
+                $unsignedClients = DocumentParty::where('document_id', $document->id)
+                                                ->where('role_type', 'client')
+                                                ->whereNull('signature_path')
+                                                ->count();
+                if ($unsignedClients === 0) {
+                    // Semua mitra sudah tanda tangan → dokumen AKTIF
+                    $document->update(['status' => 'signed']);
+                    DocumentHistory::create([
+                        'document_id' => $document->id,
+                        'user_id' => $userId,
+                        'action' => 'Status Change',
+                        'message' => 'Semua Mitra telah menandatangani, dokumen AKTIF'
+                    ]);
+                } else {
+                    DocumentHistory::create([
+                        'document_id' => $document->id,
+                        'user_id' => $userId,
+                        'action' => 'Signed',
+                        'message' => 'Menandatangani dokumen (Menunggu ' . $unsignedClients . ' mitra lain)'
                     ]);
                 }
             }
@@ -609,5 +663,20 @@ class DocumentController extends Controller
         });
 
         return response()->json($results);
+    }
+
+    public function exportPdf($id)
+    {
+        $document = Document::findOrFail($id);
+
+        if (!$document->file_path) {
+            abort(404, 'Dokumen belum memiliki file PDF.');
+        }
+
+        if (\Illuminate\Support\Facades\Storage::disk('public')->exists($document->file_path)) {
+            return response()->download(storage_path('app/public/' . $document->file_path), Str::slug($document->title) . '.pdf');
+        }
+
+        abort(404, 'File PDF tidak ditemukan.');
     }
 }

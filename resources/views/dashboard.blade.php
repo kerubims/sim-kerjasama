@@ -147,7 +147,9 @@
                     <th class="px-6 py-4">No</th>
                     <th class="px-6 py-4">Judul</th>
                     <th class="px-6 py-4">Jenis</th>
-                    <th class="px-6 py-4">Client</th>
+                    <th class="px-6 py-4">Mitra</th>
+                    <th class="px-6 py-4">Jabatan PIC</th>
+                    <th class="px-6 py-4">Nama PIC</th>
                     <th class="px-6 py-4">Unit</th>
                     <th class="px-6 py-4">Tanggal Dibuat</th>
                     <th class="px-6 py-4">Tanggal Selesai</th>
@@ -179,6 +181,8 @@
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
@@ -192,7 +196,7 @@
                             $statusLabel = match($doc->status) {
                                 'signed' => 'Aktif',
                                 'draft' => 'DRAFT',
-                                'review_client' => 'REVIEW CLIENT',
+                                'review_client' => 'REVIEW MITRA',
                                 'review_unit' => 'REVIEW UNIT',
                                 default => strtoupper(str_replace('_', ' ', $doc->status)),
                             };

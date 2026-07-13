@@ -35,12 +35,16 @@ class UserController extends Controller
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role'     => 'required|exists:roles,name',
+            'jabatan'  => 'nullable|string|max:255',
+            'nama_mitra' => 'nullable|string|max:255',
         ]);
 
         $user = User::create([
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => Hash::make($request->password),
+            'jabatan'  => $request->jabatan,
+            'nama_mitra' => $request->nama_mitra,
         ]);
 
         $user->assignRole($request->role);
@@ -56,11 +60,15 @@ class UserController extends Controller
             'name'  => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'role'  => 'required|exists:roles,name',
+            'jabatan'  => 'nullable|string|max:255',
+            'nama_mitra' => 'nullable|string|max:255',
         ]);
 
         $user->update([
             'name'  => $request->name,
             'email' => $request->email,
+            'jabatan'  => $request->jabatan,
+            'nama_mitra' => $request->nama_mitra,
         ]);
 
         if ($request->filled('password')) {

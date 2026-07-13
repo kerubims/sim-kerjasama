@@ -22,7 +22,9 @@
                 <th>Judul</th>
                 <th>Jenis</th>
                 <th>Nomor Dokumen</th>
-                <th>Client</th>
+                <th>Mitra</th>
+                <th>Jabatan PIC</th>
+                <th>Nama PIC</th>
                 <th>Unit</th>
                 <th>Status</th>
                 <th>Tgl Dibuat</th>
@@ -41,6 +43,8 @@
                 <td>{{ strtoupper($doc->type) }}</td>
                 <td>{{ $doc->document_number ?? '-' }}</td>
                 <td>{{ $doc->parties->where('role_type', 'client')->first()->user->name ?? '-' }}</td>
+                <td>{{ $doc->parties->where('role_type', 'client')->first()->user->jabatan ?? '-' }}</td>
+                <td>{{ $doc->parties->where('role_type', 'client')->first()->user->nama_mitra ?? '-' }}</td>
                 <td>{{ $doc->parties->where('role_type', 'unit_pengusul')->first()->user->name ?? '-' }}</td>
                 <td>{{ strtoupper(str_replace('_', ' ', $doc->status)) }}</td>
                 <td>{{ $doc->created_at->format('d M Y') }}</td>

@@ -76,50 +76,51 @@
         </div>
     </div>
 
-    <form class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+    <form method="GET" action="{{ route('reports.index') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
-            <input type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <input type="date" name="start_date" value="{{ request('start_date') }}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Akhir</label>
-            <input type="date" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <input type="date" name="end_date" value="{{ request('end_date') }}" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Jenis Dokumen</label>
-            <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select name="type" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="">Semua Jenis</option>
-                <option>MoU</option>
-                <option>MoA</option>
-                <option>IA</option>
+                <option value="mou" {{ request('type') == 'mou' ? 'selected' : '' }}>MoU</option>
+                <option value="moa" {{ request('type') == 'moa' ? 'selected' : '' }}>MoA</option>
+                <option value="ia" {{ request('type') == 'ia' ? 'selected' : '' }}>IA</option>
             </select>
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-            <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="">Semua Status</option>
-                <option>Aktif</option>
-                <option>Draft</option>
-                <option>Review</option>
-                <option>Kedaluwarsa</option>
+                <option value="signed" {{ request('status') == 'signed' ? 'selected' : '' }}>Aktif</option>
+                <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
+                <option value="review_unit" {{ request('status') == 'review_unit' ? 'selected' : '' }}>Review Unit</option>
+                <option value="review_client" {{ request('status') == 'review_client' ? 'selected' : '' }}>Review Mitra</option>
+                <option value="expired" {{ request('status') == 'expired' ? 'selected' : '' }}>Kedaluwarsa</option>
             </select>
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Unit</label>
-            <select class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select name="unit" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="">Semua Unit</option>
-                <option>Unit TI</option>
-                <option>Unit FK</option>
-                <option>Unit FKIP</option>
+                <option value="ti">Unit TI</option>
+                <option value="fk">Unit FK</option>
+                <option value="fkip">Unit FKIP</option>
             </select>
         </div>
         <div class="flex items-end gap-2" x-data>
-            <button type="button" @click="$dispatch('toast', {type: 'info', message: 'Menerapkan filter...'})" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
+            <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition">
                 <i class="fa-solid fa-search mr-1"></i> Filter
             </button>
-            <button type="button" @click="$dispatch('toast', {type: 'success', message: 'Filter di-reset.'})" class="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition">
+            <a href="{{ route('reports.index') }}" class="px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-600 hover:bg-slate-50 transition inline-flex items-center justify-center">
                 <i class="fa-solid fa-rotate-left"></i>
-            </button>
+            </a>
         </div>
     </form>
 </div>
@@ -142,10 +143,10 @@
 
 <!-- Export Buttons -->
 <div class="flex gap-3 mb-6" x-data>
-    <a href="{{ route('reports.export-pdf') }}" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
+    <a href="{{ route('reports.export-pdf', request()->all()) }}" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
         <i class="fa-solid fa-file-pdf mr-2"></i> Export PDF
     </a>
-    <a href="{{ route('reports.export-excel') }}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
+    <a href="{{ route('reports.export-excel', request()->all()) }}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
         <i class="fa-solid fa-file-excel mr-2"></i> Export Excel
     </a>
     <button @click="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition">
@@ -157,7 +158,7 @@
 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="p-4 border-b border-slate-100 flex items-center justify-between">
         <h3 class="font-bold text-slate-800">Preview Laporan</h3>
-        <span class="text-xs text-slate-500">Menampilkan 5 data terbaru</span>
+        <span class="text-xs text-slate-500">Menampilkan {{ $recentDocs->count() }} data terbaru sesuai filter</span>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left text-sm text-slate-600">
@@ -193,7 +194,7 @@
                     <td class="px-6 py-3">
                         @php
                             $sc = match($doc->status) { 'signed' => 'bg-green-100 text-green-700', 'draft' => 'bg-slate-100 text-slate-600', default => 'bg-yellow-100 text-yellow-700' };
-                            $sl = match($doc->status) { 'signed' => 'Aktif', 'draft' => 'DRAFT', 'review_client' => 'REVIEW CLIENT', 'review_unit' => 'REVIEW UNIT', default => strtoupper(str_replace('_', ' ', $doc->status)) };
+                            $sl = match($doc->status) { 'signed' => 'Aktif', 'draft' => 'DRAFT', 'review_client' => 'REVIEW MITRA', 'review_unit' => 'REVIEW UNIT', default => strtoupper(str_replace('_', ' ', $doc->status)) };
                         @endphp
                         <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $sc }}">{{ $sl }}</span>
                     </td>

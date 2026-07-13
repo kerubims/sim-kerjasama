@@ -12,19 +12,20 @@ class TrackingController extends Controller
     {
         $search = $request->input('search', '');
 
-        // Get all root documents (MoU = no parent) with children hierarchy
+        // Get all root documents (MoU = no parent) with children hierarchy, only showing active/expired ones
         $query = Document::with([
                 'parties.user',
                 'children' => function ($q) {
-                    $q->with([
+                    $q->whereIn('status', ['signed', 'expired'])->with([
                         'parties.user',
                         'children' => function ($q2) {
-                            $q2->with('parties.user');
+                            $q2->whereIn('status', ['signed', 'expired'])->with('parties.user');
                         }
                     ]);
                 }
             ])
-            ->whereNull('parent_id');
+            ->whereNull('parent_id')
+            ->whereIn('status', ['signed', 'expired']);
 
         if ($search) {
             // Search in root or children

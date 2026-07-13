@@ -11,6 +11,7 @@ class DocumentParty extends Model
         'user_id',
         'role_type',
         'signature_path',
+        'stamp_path',
         'signed_at',
     ];
 

@@ -47,7 +47,7 @@
             @php
                 $statusChipLabel = match(request('status')) {
                     'draft' => 'Draft',
-                    'review_client' => 'Review Client',
+                    'review_client' => 'Review Mitra',
                     'review_unit' => 'Review Unit',
                     'signed' => 'Aktif',
                     'expiring' => 'Masa Tenggang',
@@ -137,7 +137,7 @@
                         <select name="status" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                             <option value="">Semua Status</option>
                             <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                            <option value="review_client" {{ request('status') == 'review_client' ? 'selected' : '' }}>Review Client</option>
+                            <option value="review_client" {{ request('status') == 'review_client' ? 'selected' : '' }}>Review Mitra</option>
                             <option value="review_unit" {{ request('status') == 'review_unit' ? 'selected' : '' }}>Review Unit</option>
                             <option value="signed" {{ request('status') == 'signed' ? 'selected' : '' }}>Aktif</option>
                             <option value="expiring" {{ request('status') == 'expiring' ? 'selected' : '' }}>Masa Tenggang</option>
@@ -157,7 +157,7 @@
                 </div>
 
                 <div>
-                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Mitra / Client</label>
+                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Mitra</label>
                     <select name="client" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                         <option value="">Semua Mitra</option>
                         @foreach($clients as $c)
@@ -198,9 +198,12 @@
                     <th class="px-6 py-4">No</th>
                     <th class="px-6 py-4">Judul</th>
                     <th class="px-6 py-4">Jenis</th>
-                    <th class="px-6 py-4">Client</th>
+                    <th class="px-6 py-4">Mitra</th>
+                    <th class="px-6 py-4">Nama PIC</th>
+                    <th class="px-6 py-4">Jabatan PIC</th>
                     <th class="px-6 py-4">Unit</th>
                     <th class="px-6 py-4">Tanggal Dibuat</th>
+                    <th class="px-6 py-4">Tanggal Mulai</th>
                     <th class="px-6 py-4">Tanggal Selesai</th>
                     <th class="px-6 py-4">Status</th>
                     <th class="px-6 py-4 text-right">Aksi</th>
@@ -229,9 +232,12 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
+                    <td class="px-6 py-4">{{ $doc->start_date ? \Carbon\Carbon::parse($doc->start_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4">
                         @php
@@ -248,7 +254,7 @@
                                 $statusLabel = match($doc->status) {
                                     'signed' => 'Aktif',
                                     'draft' => 'DRAFT',
-                                    'review_client' => 'REVIEW CLIENT',
+                                    'review_client' => 'REVIEW MITRA',
                                     'review_unit' => 'REVIEW UNIT',
                                     default => strtoupper(str_replace('_', ' ', $doc->status)),
                                 };
@@ -272,9 +278,9 @@
                         @endif
                         @role('super_admin')
                         <button type="button"
-                            onclick="openEditDateModal({{ $doc->id }}, '{{ $doc->start_date }}', '{{ $doc->end_date }}', '{{ addslashes($doc->title) }}')"
+                            onclick="openEditDateModal({{ $doc->id }}, '{{ addslashes($doc->document_number) }}', '{{ $doc->start_date }}', '{{ $doc->end_date }}', '{{ addslashes($doc->title) }}')"
                             class="text-slate-500 hover:text-slate-700 text-xs font-medium">
-                            <i class="fa-solid fa-calendar-days mr-1"></i> Tanggal
+                            <i class="fa-solid fa-pen mr-1"></i> Data
                         </button>
                         @endrole
                     </td>
@@ -323,10 +329,6 @@
                 
                 <div class="space-y-4">
                     <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Dokumen</label>
-                        <input type="text" name="document_number" value="{{ old('document_number') }}" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan nomor dokumen...">
-                    </div>
-                    <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Judul Kerjasama</label>
                         <input type="text" name="title" value="{{ old('title') }}" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan judul...">
                     </div>
@@ -337,6 +339,11 @@
                             <option value="moa" {{ old('type') == 'moa' ? 'selected' : '' }}>MoA (Memorandum of Agreement)</option>
                             <option value="ia" {{ old('type') == 'ia' ? 'selected' : '' }}>IA (Implementation Arrangement)</option>
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Dokumen <span class="text-slate-400 text-xs font-normal ml-1">(Opsional saat draft)</span></label>
+                        <input type="text" name="document_number" value="{{ old('document_number') }}" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan nomor dokumen...">
+                        <p id="last-doc-number-info" class="text-xs text-blue-600 mt-1 hidden"><i class="fa-solid fa-circle-info mr-1"></i> Nomor dokumen terakhir: <strong id="last-doc-number-text"></strong></p>
                     </div>
                     
                     <div>
@@ -355,12 +362,12 @@
                                     <option value="">-- Pilih Pihak {{ $idx == 0 ? 'Pertama' : ($idx == 1 ? 'Kedua' : 'Tambahan') }} --</option>
                                     <optgroup label="Unit Pengusul (Internal)">
                                         @foreach($units as $unit)
-                                            <option value="{{ $unit->id }}" {{ $selectedParty == $unit->id ? 'selected' : '' }}>{{ $unit->name }}</option>
+                                            <option value="{{ $unit->id }}" {{ $selectedParty == $unit->id ? 'selected' : '' }}>{{ $unit->jabatan ?: $unit->name }}</option>
                                         @endforeach
                                     </optgroup>
-                                    <optgroup label="Client / Mitra (Eksternal)">
+                                    <optgroup label="Mitra (Eksternal)">
                                         @foreach($clients as $client)
-                                            <option value="{{ $client->id }}" {{ $selectedParty == $client->id ? 'selected' : '' }}>{{ $client->name }}</option>
+                                            <option value="{{ $client->id }}" {{ $selectedParty == $client->id ? 'selected' : '' }}>{{ $client->nama_mitra ?: $client->name }}</option>
                                         @endforeach
                                     </optgroup>
                                 </select>
@@ -369,6 +376,15 @@
                             @endforeach
                         </div>
                         <p class="text-xs text-slate-500 mt-2"><i class="fa-solid fa-info-circle mr-1"></i> Minimal 2 pihak. Anda dapat menambahkan lebih banyak pihak jika diperlukan.</p>
+                    </div>
+
+                    <div x-show="tab === 'draft'" x-transition class="mt-2">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="allow_client_upload" id="allow_client_upload" value="1" {{ old('allow_client_upload') ? 'checked' : '' }} class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-slate-300 rounded">
+                            <label for="allow_client_upload" class="ml-2 block text-sm text-slate-700">
+                                Izinkan Mitra mengunggah file template .docx
+                            </label>
+                        </div>
                     </div>
                     
                     <div id="parent-doc-container" class="hidden">
@@ -384,14 +400,14 @@
                             Opsional: Pilih dokumen induk jika dokumen ini merupakan turunan dari dokumen lain.
                         </p>
                     </div>
-                    <div class="grid grid-cols-2 gap-4">
+                    <div x-show="tab === 'upload'" x-transition class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
-                            <input type="date" name="start_date" value="{{ old('start_date') }}" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="date" name="start_date" value="{{ old('start_date') }}" :required="tab === 'upload'" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Selesai</label>
-                            <input type="date" name="end_date" value="{{ old('end_date') }}" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="date" name="end_date" value="{{ old('end_date') }}" :required="tab === 'upload'" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                     </div>
                     
@@ -416,19 +432,24 @@
         <form id="form-edit-date">
             <input type="hidden" id="edit-date-doc-id">
             <div class="bg-white px-6 pt-6 pb-4">
-                <h3 class="text-base font-semibold text-slate-900 mb-1">Ubah Tanggal Dokumen</h3>
+                <h3 class="text-base font-semibold text-slate-900 mb-1">Ubah Data Dokumen</h3>
                 <p id="edit-date-title" class="text-sm text-slate-500 mb-4 truncate"></p>
 
                 <div id="edit-date-error" class="hidden mb-3 bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm"></div>
 
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Dokumen</label>
+                    <input type="text" id="edit-date-doc-number" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                </div>
+
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
-                        <input type="date" id="edit-date-start" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <input type="date" id="edit-date-start" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Selesai</label>
-                        <input type="date" id="edit-date-end" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <input type="date" id="edit-date-end" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                     </div>
                 </div>
             </div>
@@ -474,8 +495,19 @@
             options: []
         });
 
+        const lastDocNumbers = @json($lastDocNumbers ?? []);
+        const lastDocInfo = document.getElementById('last-doc-number-info');
+        const lastDocText = document.getElementById('last-doc-number-text');
+
         function updateParentOptions() {
             const type = typeSelect.value;
+            
+            if (lastDocNumbers[type]) {
+                lastDocText.textContent = lastDocNumbers[type];
+                lastDocInfo.classList.remove('hidden');
+            } else {
+                lastDocInfo.classList.add('hidden');
+            }
             
             if (type === 'mou') {
                 parentContainer.classList.add('hidden');
@@ -515,12 +547,12 @@
             <option value="">-- Pilih Pihak Tambahan --</option>
             <optgroup label="Unit Pengusul (Internal)">
                 @foreach($units as $unit)
-                    <option value="{{ $unit->id }}">{{ $unit->name }}</option>
+                    <option value="{{ $unit->id }}">{{ $unit->jabatan ?: $unit->name }}</option>
                 @endforeach
             </optgroup>
-            <optgroup label="Client / Mitra (Eksternal)">
+            <optgroup label="Mitra (Eksternal)">
                 @foreach($clients as $client)
-                    <option value="{{ $client->id }}">{{ $client->name }}</option>
+                    <option value="{{ $client->id }}">{{ $client->nama_mitra ?: $client->name }}</option>
                 @endforeach
             </optgroup>
         </select>
@@ -617,8 +649,9 @@
 
 <script>
 // Edit Date Modal
-function openEditDateModal(docId, startDate, endDate, title) {
+function openEditDateModal(docId, docNumber, startDate, endDate, title) {
     document.getElementById('edit-date-doc-id').value = docId;
+    document.getElementById('edit-date-doc-number').value = docNumber;
     document.getElementById('edit-date-start').value = startDate;
     document.getElementById('edit-date-end').value = endDate;
     document.getElementById('edit-date-title').textContent = title;
@@ -630,6 +663,7 @@ function openEditDateModal(docId, startDate, endDate, title) {
 document.getElementById('form-edit-date').addEventListener('submit', async function(e) {
     e.preventDefault();
     const docId = document.getElementById('edit-date-doc-id').value;
+    const docNumber = document.getElementById('edit-date-doc-number').value;
     const startDate = document.getElementById('edit-date-start').value;
     const endDate = document.getElementById('edit-date-end').value;
     const errEl = document.getElementById('edit-date-error');
@@ -647,7 +681,7 @@ document.getElementById('form-edit-date').addEventListener('submit', async funct
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 'Accept': 'application/json',
             },
-            body: JSON.stringify({ start_date: startDate, end_date: endDate }),
+            body: JSON.stringify({ document_number: docNumber, start_date: startDate, end_date: endDate }),
         });
 
         const data = await res.json();

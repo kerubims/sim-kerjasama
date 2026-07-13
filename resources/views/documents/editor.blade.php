@@ -16,7 +16,7 @@
     $statusLabel = match($doc->status) {
         'signed' => 'AKTIF',
         'draft' => 'DRAFT',
-        'review_client' => 'REVIEW CLIENT',
+        'review_client' => 'REVIEW MITRA',
         'review_unit' => 'REVIEW UNIT',
         default => strtoupper(str_replace('_', ' ', $doc->status)),
     };
@@ -56,7 +56,7 @@
 
         <div class="flex items-center gap-3">
             {{-- Save Button --}}
-            @if($canEdit)
+            @if($canEdit && !$doc->file_path)
             <button @click="saveContent()" class="text-slate-600 hover:text-slate-900 px-3 py-2 text-sm font-medium transition">
                 <i class="fa-regular fa-floppy-disk mr-1"></i> Simpan
             </button>
@@ -65,13 +65,7 @@
             {{-- Workflow Buttons --}}
             @if($user->hasRole('super_admin') && $doc->status === 'draft')
             <button @click="showSendModal=true" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
-                Kirim ke Client <i class="fa-solid fa-paper-plane ml-1"></i>
-            </button>
-            @endif
-
-            @if($user->hasRole('client') && $doc->status === 'review_client' && !$userHasSigned)
-            <button @click="showSignModal=true" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
-                <i class="fa-solid fa-signature mr-1"></i> Tanda Tangan
+                Kirim ke Unit Pengusul <i class="fa-solid fa-paper-plane ml-1"></i>
             </button>
             @endif
 
@@ -80,7 +74,16 @@
                 <i class="fa-solid fa-xmark mr-1"></i> Tolak / Kembalikan
             </button>
             <button @click="showSignModal=true" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
-                <i class="fa-solid fa-signature mr-1"></i> Tanda Tangan Final
+                <i class="fa-solid fa-signature mr-1"></i> Tanda Tangan
+            </button>
+            @endif
+
+            @if($user->hasRole('client') && $doc->status === 'review_client' && !$userHasSigned)
+            <button @click="rejectDocument()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
+                <i class="fa-solid fa-xmark mr-1"></i> Tolak / Kembalikan
+            </button>
+            <button @click="showSignModal=true" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
+                <i class="fa-solid fa-signature mr-1"></i> Tanda Tangan
             </button>
             @endif
 
@@ -246,13 +249,18 @@
                 <div class="space-y-3">
                     @foreach($doc->parties as $party)
                     <div class="border border-slate-200 rounded p-2 bg-white">
-                        <div class="text-xs text-slate-400 mb-1">{{ $party->user->name }} ({{ $party->role_type === 'client' ? 'Client' : 'Unit Pengusul' }})</div>
+                        <div class="text-xs text-slate-400 mb-1">{{ $party->user->name }} ({{ $party->role_type === 'client' ? 'Mitra' : 'Unit Pengusul' }})</div>
                         @if($party->signature_path === 'offline_signed')
                         <div class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 inline-block mt-1">
                             <i class="fa-solid fa-file-signature mr-1"></i> Ditandatangani Offline
                         </div>
                         @elseif($party->signature_path)
-                        <img src="{{ Storage::url($party->signature_path) }}" class="h-12" alt="Signature">
+                        <div class="relative inline-block">
+                            <img src="{{ Storage::url($party->signature_path) }}" class="h-12" alt="Signature">
+                            @if($party->stamp_path)
+                            <img src="{{ Storage::url($party->stamp_path) }}" class="absolute -bottom-1 -right-1 h-10 w-10 object-contain opacity-80" alt="Stempel" title="Stempel Keabsahan">
+                            @endif
+                        </div>
                         @else
                         <div class="text-xs text-slate-300 italic">Belum ditandatangani</div>
                         @endif
@@ -277,213 +285,224 @@ function editorPage() {
         allowUpload: false,
         signaturePreview: null,
         signatureFile: null,
+        stampPreview: null,
+        stampFile: null,
         activeCommentAnchor: null,
         activeCommentQuote: null,
         csrfToken: document.querySelector('meta[name="csrf-token"]').content,
 
         init() {
             const canEdit = @json($canEdit);
-            const canImportDocx = @json($canImportDocx);
+            const canImportDocx = @json($canImportDocx ?? false);
+            const editorArea = document.getElementById('editor-area');
 
-            const customSetup = (editor) => {
-                editor.ui.registry.addButton('importdocx', {
-                    text: 'Import DOCX',
-                    icon: 'upload',
-                    onAction: () => {
-                        const input = document.createElement('input');
-                        input.type = 'file';
-                        input.accept = '.docx';
-                        input.onchange = (e) => {
-                            const file = e.target.files[0];
-                            if (file) {
-                                const reader = new FileReader();
-                                reader.onload = function(loadEvent) {
-                                    const arrayBuffer = loadEvent.target.result;
-                                    
-                                    const options = {
-                                        styleMap: [
-                                            "p[style-name='Heading 1'] => h1:fresh",
-                                            "p[style-name='Heading 2'] => h2:fresh",
-                                            "p[style-name='Heading 3'] => h3:fresh",
-                                            "p[style-name='Heading 4'] => h4:fresh",
-                                            "p[style-name='Title'] => h1.title",
-                                            "p[style-name='Subtitle'] => h2.subtitle",
-                                            "p[style-name='align-center'] => p.align-center",
-                                            "p[style-name='align-right'] => p.align-right",
-                                            "p[style-name='align-justify'] => p.align-justify",
-                                            "u => u",
-                                            "strike => s"
-                                        ]
+            if (editorArea) {
+                const customSetup = (editor) => {
+                    editor.ui.registry.addButton('importdocx', {
+                        text: 'Import DOCX',
+                        icon: 'upload',
+                        onAction: () => {
+                            const input = document.createElement('input');
+                            input.type = 'file';
+                            input.accept = '.docx';
+                            input.onchange = (e) => {
+                                const file = e.target.files[0];
+                                if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = function(loadEvent) {
+                                        const arrayBuffer = loadEvent.target.result;
+                                        
+                                        const options = {
+                                            styleMap: [
+                                                "p[style-name='Heading 1'] => h1:fresh",
+                                                "p[style-name='Heading 2'] => h2:fresh",
+                                                "p[style-name='Heading 3'] => h3:fresh",
+                                                "p[style-name='Heading 4'] => h4:fresh",
+                                                "p[style-name='Title'] => h1.title",
+                                                "p[style-name='Subtitle'] => h2.subtitle",
+                                                "p[style-name='align-center'] => p.align-center",
+                                                "p[style-name='align-right'] => p.align-right",
+                                                "p[style-name='align-justify'] => p.align-justify",
+                                                "u => u",
+                                                "strike => s"
+                                            ]
+                                        };
+
+                                        if (window.mammoth && mammoth.transforms && mammoth.transforms.paragraph) {
+                                            options.transformDocument = mammoth.transforms.paragraph(function(paragraph) {
+                                                if (paragraph.alignment === "center") {
+                                                    return {...paragraph, styleName: "align-center"};
+                                                } else if (paragraph.alignment === "right") {
+                                                    return {...paragraph, styleName: "align-right"};
+                                                } else if (paragraph.alignment === "both" || paragraph.alignment === "justify") {
+                                                    return {...paragraph, styleName: "align-justify"};
+                                                }
+                                                return paragraph;
+                                            });
+                                        }
+
+                                        if (window.mammoth) {
+                                            mammoth.convertToHtml({arrayBuffer: arrayBuffer}, options)
+                                                .then(function(result){
+                                                    let html = result.value;
+                                                    html = html.replace(/class="align-center"/g, 'style="text-align: center;"');
+                                                    html = html.replace(/class="align-right"/g, 'style="text-align: right;"');
+                                                    html = html.replace(/class="align-justify"/g, 'style="text-align: justify;"');
+                                                    editor.setContent(html);
+                                                    if (result.messages.length > 0) {
+                                                        console.warn('Mammoth messages:', result.messages);
+                                                    }
+                                                })
+                                                .catch(function(err) {
+                                                    alert('Gagal membaca file DOCX: ' + err.message);
+                                                });
+                                        } else {
+                                            alert('Library mammoth belum dimuat. Tidak dapat mengimport DOCX.');
+                                        }
                                     };
+                                    reader.readAsArrayBuffer(file);
+                                }
+                            };
+                            input.click();
+                        }
+                    });
 
-                                    if (mammoth.transforms && mammoth.transforms.paragraph) {
-                                        options.transformDocument = mammoth.transforms.paragraph(function(paragraph) {
-                                            if (paragraph.alignment === "center") {
-                                                return {...paragraph, styleName: "align-center"};
-                                            } else if (paragraph.alignment === "right") {
-                                                return {...paragraph, styleName: "align-right"};
-                                            } else if (paragraph.alignment === "both" || paragraph.alignment === "justify") {
-                                                return {...paragraph, styleName: "align-justify"};
-                                            }
-                                            return paragraph;
-                                        });
+                    // Menu Dropdown untuk merubah ukuran kertas / canvas
+                    editor.ui.registry.addMenuButton('papersize', {
+                        text: 'Ukuran Kertas',
+                        icon: 'document-properties',
+                        fetch: function (callback) {
+                            var items = [
+                                {
+                                    type: 'menuitem',
+                                    text: 'A4 Portrait (21cm x 29.7cm)',
+                                    onAction: function () {
+                                        editor.dom.setStyle(editor.getBody(), 'width', '21cm');
+                                        editor.dom.setStyle(editor.getBody(), 'min-height', '29.7cm');
+                                        editor.dom.setStyle(editor.getBody(), 'padding', '2.5cm 2cm');
                                     }
+                                },
+                                {
+                                    type: 'menuitem',
+                                    text: 'A4 Landscape (29.7cm x 21cm)',
+                                    onAction: function () {
+                                        editor.dom.setStyle(editor.getBody(), 'width', '29.7cm');
+                                        editor.dom.setStyle(editor.getBody(), 'min-height', '21cm');
+                                        editor.dom.setStyle(editor.getBody(), 'padding', '2cm 2.5cm');
+                                    }
+                                },
+                                {
+                                    type: 'menuitem',
+                                    text: 'F4 / Folio (21.5cm x 33cm)',
+                                    onAction: function () {
+                                        editor.dom.setStyle(editor.getBody(), 'width', '21.5cm');
+                                        editor.dom.setStyle(editor.getBody(), 'min-height', '33cm');
+                                        editor.dom.setStyle(editor.getBody(), 'padding', '2.5cm 2cm');
+                                    }
+                                },
+                                {
+                                    type: 'menuitem',
+                                    text: 'Auto Adjust (Fluid Canvas)',
+                                    onAction: function () {
+                                        editor.dom.setStyle(editor.getBody(), 'width', 'calc(100% - 4rem)');
+                                        editor.dom.setStyle(editor.getBody(), 'min-height', '100vh');
+                                        editor.dom.setStyle(editor.getBody(), 'padding', '2rem');
+                                    }
+                                }
+                            ];
+                            callback(items);
+                        }
+                    });
 
-                                    mammoth.convertToHtml({arrayBuffer: arrayBuffer}, options)
-                                        .then(function(result){
-                                            let html = result.value;
-                                            html = html.replace(/class="align-center"/g, 'style="text-align: center;"');
-                                            html = html.replace(/class="align-right"/g, 'style="text-align: right;"');
-                                            html = html.replace(/class="align-justify"/g, 'style="text-align: justify;"');
-                                            editor.setContent(html);
-                                            if (result.messages.length > 0) {
-                                                console.warn('Mammoth messages:', result.messages);
-                                            }
-                                        })
-                                        .catch(function(err) {
-                                            alert('Gagal membaca file DOCX: ' + err.message);
-                                        });
-                                };
-                                reader.readAsArrayBuffer(file);
-                            }
-                        };
-                        input.click();
-                    }
+                    // Context menu for comments
+                    editor.ui.registry.addMenuItem('addcomment', {
+                        text: 'Berikan Komentar',
+                        icon: 'comment',
+                        onAction: () => {
+                            const selectionText = editor.selection.getContent({format:'text'});
+                            if (!selectionText) return;
+                            const commentId = 'mark_' + Date.now();
+                            const content = `<span id="${commentId}" style="background-color:#fef08a;padding:2px 0;" data-comment-id="${commentId}">${editor.selection.getContent()}</span>`;
+                            editor.selection.setContent(content);
+                            
+                            window.dispatchEvent(new CustomEvent('init-comment', {detail: {id: commentId, text: selectionText}}));
+                        }
+                    });
+                    editor.ui.registry.addContextMenu('selection', {
+                        update: () => !editor.selection.isCollapsed() ? 'addcomment' : ''
+                    });
+                };
+
+                let toolbarConfig = false;
+                if (canEdit) {
+                    const importBtn = (canImportDocx ? ' importdocx |' : '');
+                    toolbarConfig = `undo redo | papersize${importBtn} blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent | forecolor backcolor removeformat | charmap emoticons | fullscreen preview | help`;
+                }
+
+                tinymce.init({
+                    selector: '#editor-area',
+                    height: '100%',
+                    license_key: 'gpl',
+                    menubar: canEdit ? 'edit view insert format tools table help' : false,
+                    plugins: 'preview searchreplace autolink directionality visualblocks visualchars fullscreen image link media table charmap insertdatetime advlist lists wordcount help emoticons',
+                    toolbar: toolbarConfig,
+                    readonly: !canEdit,
+                    content_style: `
+                        body {
+                            background-color: white;
+                            width: 21cm;
+                            min-height: 29.7cm;
+                            padding: 2.5cm 2cm;
+                            margin: 2rem auto;
+                            box-shadow: 0 0 10px rgba(0,0,0,0.15);
+                            box-sizing: border-box;
+                            font-family: Tahoma, "Times New Roman", Times, serif;
+                            font-size: 11pt;
+                            line-height: 1.5;
+                            transition: width 0.3s ease, min-height 0.3s ease, padding 0.3s ease;
+                        }
+                        html {
+                            background-color: #f1f5f9;
+                            scroll-behavior: smooth;
+                        }
+                        p { margin-top: 0; margin-bottom: 10px; }
+                        table { border-collapse: collapse; width: 100%; }
+                        table, th, td { border: 1px solid black; }
+                        th, td { padding: 5px; }
+                    `,
+                    branding: false,
+                    promotion: false,
+                    skin: 'oxide',
+                    statusbar: true,
+                    resize: false,
+                    contextmenu: 'addcomment link image table',
+                    setup: customSetup
                 });
 
-                // Menu Dropdown untuk merubah ukuran kertas / canvas
-                editor.ui.registry.addMenuButton('papersize', {
-                    text: 'Ukuran Kertas',
-                    icon: 'document-properties',
-                    fetch: function (callback) {
-                        var items = [
-                            {
-                                type: 'menuitem',
-                                text: 'A4 Portrait (21cm x 29.7cm)',
-                                onAction: function () {
-                                    editor.dom.setStyle(editor.getBody(), 'width', '21cm');
-                                    editor.dom.setStyle(editor.getBody(), 'min-height', '29.7cm');
-                                    editor.dom.setStyle(editor.getBody(), 'padding', '2.5cm 2cm');
-                                }
-                            },
-                            {
-                                type: 'menuitem',
-                                text: 'A4 Landscape (29.7cm x 21cm)',
-                                onAction: function () {
-                                    editor.dom.setStyle(editor.getBody(), 'width', '29.7cm');
-                                    editor.dom.setStyle(editor.getBody(), 'min-height', '21cm');
-                                    editor.dom.setStyle(editor.getBody(), 'padding', '2cm 2.5cm');
-                                }
-                            },
-                            {
-                                type: 'menuitem',
-                                text: 'F4 / Folio (21.5cm x 33cm)',
-                                onAction: function () {
-                                    editor.dom.setStyle(editor.getBody(), 'width', '21.5cm');
-                                    editor.dom.setStyle(editor.getBody(), 'min-height', '33cm');
-                                    editor.dom.setStyle(editor.getBody(), 'padding', '2.5cm 2cm');
-                                }
-                            },
-                            {
-                                type: 'menuitem',
-                                text: 'Auto Adjust (Fluid Canvas)',
-                                onAction: function () {
-                                    editor.dom.setStyle(editor.getBody(), 'width', 'calc(100% - 4rem)');
-                                    editor.dom.setStyle(editor.getBody(), 'min-height', '100vh');
-                                    editor.dom.setStyle(editor.getBody(), 'padding', '2rem');
-                                }
-                            }
-                        ];
-                        callback(items);
-                    }
+                window.addEventListener('init-comment', (e) => {
+                    this.activeCommentAnchor = e.detail.id;
+                    this.activeCommentQuote = e.detail.text;
+                    this.activeTab = 'comments';
+                    setTimeout(() => document.getElementById('comment-input')?.focus(), 100);
                 });
 
-                // Context menu for comments
-                editor.ui.registry.addMenuItem('addcomment', {
-                    text: 'Berikan Komentar',
-                    icon: 'comment',
-                    onAction: () => {
-                        const selectionText = editor.selection.getContent({format:'text'});
-                        if (!selectionText) return;
-                        const commentId = 'mark_' + Date.now();
-                        const content = `<span id="${commentId}" style="background-color:#fef08a;padding:2px 0;" data-comment-id="${commentId}">${editor.selection.getContent()}</span>`;
-                        editor.selection.setContent(content);
-                        
-                        window.dispatchEvent(new CustomEvent('init-comment', {detail: {id: commentId, text: selectionText}}));
-                    }
+                window.addEventListener('scroll-to-anchor', (e) => {
+                    this.scrollToAnchor(e.detail);
                 });
-                editor.ui.registry.addContextMenu('selection', {
-                    update: () => !editor.selection.isCollapsed() ? 'addcomment' : ''
-                });
-            };
-
-            let toolbarConfig = false;
-            if (canEdit) {
-                const importBtn = (canImportDocx ? ' importdocx |' : '');
-                toolbarConfig = `undo redo | papersize${importBtn} blocks fontfamily fontsize | bold italic underline strikethrough | align numlist bullist | link image | table media | lineheight outdent indent | forecolor backcolor removeformat | charmap emoticons | fullscreen preview | help`;
             }
-
-            tinymce.init({
-                selector: '#editor-area',
-                height: '100%',
-                license_key: 'gpl',
-                menubar: canEdit ? 'edit view insert format tools table help' : false,
-                plugins: 'preview searchreplace autolink directionality visualblocks visualchars fullscreen image link media table charmap insertdatetime advlist lists wordcount help emoticons',
-                toolbar: toolbarConfig,
-                readonly: !canEdit,
-                content_style: `
-                    body {
-                        background-color: white;
-                        width: 21cm;
-                        min-height: 29.7cm;
-                        padding: 2.5cm 2cm;
-                        margin: 2rem auto;
-                        box-shadow: 0 0 10px rgba(0,0,0,0.15);
-                        box-sizing: border-box;
-                        font-family: Tahoma, "Times New Roman", Times, serif;
-                        font-size: 11pt;
-                        line-height: 1.5;
-                        transition: width 0.3s ease, min-height 0.3s ease, padding 0.3s ease;
-                    }
-                    html {
-                        background-color: #f1f5f9;
-                        scroll-behavior: smooth;
-                    }
-                    p { margin-top: 0; margin-bottom: 10px; }
-                    table { border-collapse: collapse; width: 100%; }
-                    table, th, td { border: 1px solid black; }
-                    th, td { padding: 5px; }
-                `,
-                branding: false,
-                promotion: false,
-                skin: 'oxide',
-                statusbar: true,
-                resize: false,
-                contextmenu: 'addcomment link image table',
-                setup: customSetup
-            });
-
-            window.addEventListener('init-comment', (e) => {
-                this.activeCommentAnchor = e.detail.id;
-                this.activeCommentQuote = e.detail.text;
-                this.activeTab = 'comments';
-                setTimeout(() => document.getElementById('comment-input')?.focus(), 100);
-            });
-
-            window.addEventListener('scroll-to-anchor', (e) => {
-                this.scrollToAnchor(e.detail);
-            });
         },
 
         async saveContent(showAlertAndReload = true) {
-            const content = tinymce.get('editor-area').getContent();
+            if (!document.getElementById('editor-area')) return;
+            const editor = tinymce.get('editor-area');
+            if (!editor) return;
+            const content = editor.getContent();
             const res = await fetch(`/documents/${this.docId}/content`, {
                 method: 'PUT',
                 headers: {'Content-Type':'application/json','X-CSRF-TOKEN':this.csrfToken},
                 body: JSON.stringify({content})
             });
             if (res.ok && showAlertAndReload) {
-                // Ubah tampilan tombol simpan sementara (toast effect)
                 const saveBtn = document.querySelector('button[\\@click="saveContent()"]');
                 if (saveBtn) {
                     const oldHtml = saveBtn.innerHTML;
@@ -495,8 +514,7 @@ function editorPage() {
                     }, 2000);
                 }
                 
-                // Tambahkan log riwayat secara dinamis tanpa refresh
-                const user_name = @json(Auth::user()->name);
+                const user_name = @json(Auth::user()->name ?? 'User');
                 const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
                 if(historyContainer) {
                     const hHtml = `
@@ -511,14 +529,16 @@ function editorPage() {
             }
         },
 
-        async confirmSendToClient() {
-            // Auto-save content terlebih dahulu sebelum merubah status
-            await this.saveContent(false);
+        async confirmSendToUnit() {
+            // Auto-save sebelum mengubah status/mengirim
+            if (document.getElementById('editor-area')) {
+                await this.saveContent(false);
+            }
 
             const res = await fetch(`/documents/${this.docId}/status`, {
                 method: 'PUT',
                 headers: {'Content-Type':'application/json','X-CSRF-TOKEN':this.csrfToken},
-                body: JSON.stringify({status:'review_client', allowUpload: this.allowUpload})
+                body: JSON.stringify({status:'review_unit'})
             });
             if (res.ok) {
                 this.showSendModal = false;
@@ -527,7 +547,13 @@ function editorPage() {
         },
 
         async rejectDocument() {
-            if(!confirm('Apakah Anda yakin ingin menolak dokumen ini? Dokumen akan dikembalikan ke Draft/Client dan tanda tangan direset.')) return;
+            if(!confirm('Apakah Anda yakin ingin menolak dokumen ini? Dokumen akan dikembalikan untuk direvisi dan tanda tangan direset.')) return;
+            
+            // Auto-save sebelum menolak jika editor aktif agar editan tersimpan
+            if (document.getElementById('editor-area')) {
+                await this.saveContent(false);
+            }
+
             const res = await fetch(`/documents/${this.docId}/reject`, {
                 method: 'POST',
                 headers: {'X-CSRF-TOKEN':this.csrfToken}
@@ -538,15 +564,17 @@ function editorPage() {
         },
 
         scrollToAnchor(anchorId) {
-            if (!anchorId) return;
-            const editor = tinymce.get('editor-area');
-            const el = editor.getWin().document.getElementById(anchorId);
-            if (el) {
-                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                // blink effect
-                const oldBg = el.style.backgroundColor;
-                el.style.backgroundColor = '#fca5a5'; // red-300
-                setTimeout(() => el.style.backgroundColor = oldBg, 1500);
+            if (document.getElementById('editor-area')) {
+                const editor = tinymce.get('editor-area');
+                if (!editor || !anchorId) return;
+                const el = editor.getWin().document.getElementById(anchorId);
+                if (el) {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // blink effect
+                    const oldBg = el.style.backgroundColor;
+                    el.style.backgroundColor = '#fca5a5'; // red-300
+                    setTimeout(() => el.style.backgroundColor = oldBg, 1500);
+                }
             }
         },
 
@@ -555,13 +583,12 @@ function editorPage() {
             const text = input.value;
             if (!text) return;
 
-            // Pastikan jika ada highlight (anchor) kuning baru, itu di-save dulu
-            if (this.activeCommentAnchor) {
+            if (this.activeCommentAnchor && document.getElementById('editor-area')) {
                 await this.saveContent(false);
             }
 
-            const currentQuote = this.activeCommentQuote;
-            const currentAnchor = this.activeCommentAnchor;
+            const currentQuote = document.getElementById('editor-area') ? this.activeCommentQuote : null;
+            const currentAnchor = document.getElementById('editor-area') ? this.activeCommentAnchor : null;
 
             const res = await fetch(`/documents/${this.docId}/comments`, {
                 method: 'POST',
@@ -578,22 +605,24 @@ function editorPage() {
                 this.activeCommentAnchor = null;
                 this.activeCommentQuote = null;
                 
-                const user_name = @json(Auth::user()->name);
+                const user_name = @json(Auth::user()->name ?? 'User');
                 const avatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user_name)}&background=0D8ABC&color=fff`;
                 
                 let quoteHtml = '';
                 if (currentQuote) {
                     quoteHtml = `<div class="mb-2 pl-2 border-l-2 border-yellow-400 bg-yellow-50 text-xs text-slate-600 italic py-1">"${currentQuote}"</div>`;
                 }
+
+                const clickAction = currentAnchor ? `onclick="window.dispatchEvent(new CustomEvent('scroll-to-anchor', {detail: '${currentAnchor}'}))"` : '';
                 
                 const newHtml = `
-                    <div class="comment-block bg-slate-50 rounded-lg p-3 border border-slate-200 cursor-pointer hover:bg-slate-100 transition" onclick="window.dispatchEvent(new CustomEvent('scroll-to-anchor', {detail: '${currentAnchor || ''}'}))">
+                    <div class="comment-block bg-slate-50 rounded-lg p-3 border border-slate-200 cursor-pointer hover:bg-slate-100 transition" ${clickAction}>
                         <div class="flex items-start gap-2 mb-2">
                             <img src="${avatar}" class="w-6 h-6 rounded-full mt-0.5" alt="">
                             <div class="flex-1">
                                 <div class="flex items-center justify-between mb-1">
                                     <div class="text-xs font-semibold text-slate-700">${user_name}</div>
-                                    <button onclick="event.stopPropagation(); document.querySelector('[x-data]').__x.$data.resolveComment(${data.comment.id}, '${currentAnchor}', this.closest('.comment-block'))" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-200 hover:bg-green-500 hover:text-white text-slate-600 transition ml-2"><i class="fa-solid fa-check mr-1"></i>Selesaikan</button>
+                                    <button onclick="event.stopPropagation(); document.querySelector('[x-data]').__x.$data.resolveComment(${data.comment.id}, '${currentAnchor || ''}', this.closest('.comment-block'))" class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-200 hover:bg-green-500 hover:text-white text-slate-600 transition ml-2"><i class="fa-solid fa-check mr-1"></i>Selesaikan</button>
                                 </div>
                                 <div class="text-xs text-slate-400">Baru saja</div>
                             </div>
@@ -625,13 +654,12 @@ function editorPage() {
         },
 
         async resolveComment(commentId, anchorId, el) {
-            if(!confirm('Tandai komentar ini sebagai selesai? Highlight warna kuning di dokumen akan otomatis dihapus.')) return;
+            if(!confirm('Tandai komentar ini sebagai selesai?')) return;
             const res = await fetch(`/documents/${this.docId}/comments/${commentId}/resolve`, {
                 method: 'POST',
                 headers: {'X-CSRF-TOKEN':this.csrfToken}
             });
             if (res.ok) {
-                // Update UI button to badge
                 if (el) {
                     const btn = el.querySelector('button');
                     if (btn) {
@@ -643,21 +671,20 @@ function editorPage() {
                     el.classList.add('opacity-60');
                 }
 
-                // Unwrap span in editor if anchor exists
-                if (anchorId) {
+                if (anchorId && document.getElementById('editor-area')) {
                     const editor = tinymce.get('editor-area');
-                    const span = editor.getWin().document.getElementById(anchorId);
-                    if (span) {
-                        const textContent = span.innerHTML;
-                        span.insertAdjacentHTML('beforebegin', textContent);
-                        span.remove();
-                        // Autosave content silently
-                        this.saveContent(false);
+                    if (editor) {
+                        const span = editor.getWin().document.getElementById(anchorId);
+                        if (span) {
+                            const textContent = span.innerHTML;
+                            span.insertAdjacentHTML('beforebegin', textContent);
+                            span.remove();
+                            this.saveContent(false);
+                        }
                     }
                 }
 
-                // Add to history
-                const user_name = @json(Auth::user()->name);
+                const user_name = @json(Auth::user()->name ?? 'User');
                 const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
                 if(historyContainer) {
                     const hHtml = `
@@ -686,19 +713,51 @@ function editorPage() {
         handleSignatureDrop(event) {
             const file = event.dataTransfer.files[0];
             if (file) {
-                this.signatureFile = file;
                 if (!file.type.startsWith('image/')) { alert('Mohon upload file gambar'); return; }
                 if (file.size > 2*1024*1024) { alert('Maksimal 2MB'); return; }
+                this.signatureFile = file;
                 const reader = new FileReader();
                 reader.onload = (e) => { this.signaturePreview = e.target.result; };
                 reader.readAsDataURL(file);
             }
         },
 
+        previewStamp(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            if (!file.type.startsWith('image/')) { alert('Mohon upload file gambar'); return; }
+            if (file.size > 2*1024*1024) { alert('Ukuran file maksimal 2MB'); return; }
+            this.stampFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => { this.stampPreview = e.target.result; };
+            reader.readAsDataURL(file);
+        },
+
+        handleStampDrop(event) {
+            const file = event.dataTransfer.files[0];
+            if (file) {
+                if (!file.type.startsWith('image/')) { alert('Mohon upload file gambar'); return; }
+                if (file.size > 2*1024*1024) { alert('Maksimal 2MB'); return; }
+                this.stampFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => { this.stampPreview = e.target.result; };
+                reader.readAsDataURL(file);
+            }
+        },
+
         async submitSignature() {
             if (!this.signatureFile) { alert('Pilih file tanda tangan terlebih dahulu.'); return; }
+
+            // Auto-save sebelum tanda tangan jika editor aktif
+            if (document.getElementById('editor-area')) {
+                await this.saveContent(false);
+            }
+
             const formData = new FormData();
             formData.append('signature_file', this.signatureFile);
+            if (this.stampFile) {
+                formData.append('stamp_file', this.stampFile);
+            }
             const res = await fetch(`/documents/${this.docId}/sign`, {
                 method: 'POST',
                 headers: {'X-CSRF-TOKEN':this.csrfToken},
@@ -734,38 +793,61 @@ function editorPage() {
             });
 
             // Menggunakan path relatif (/storage/...) agar html2canvas tidak terblokir CORS
-            const parties = @json($doc->parties->map(fn($p) => ['name'=>$p->user->name,'role'=>$p->role_type,'sig'=>$p->signature_path ? '/storage/' . $p->signature_path : null]));
+            const parties = {!! json_encode($doc->parties->map(fn($p) => [
+                'name' => $p->user->name,
+                'role' => $p->role_type,
+                'mitra_name' => $p->user->nama_mitra,
+                'sig' => $p->signature_path ? '/storage/' . $p->signature_path : null,
+                'stamp' => $p->stamp_path ? '/storage/' . $p->stamp_path : null
+            ])) !!};
             let sigBlock = '<div style="margin-top:60px;display:flex;justify-content:space-between;page-break-inside:avoid;">';
             parties.forEach((p,i) => {
+                let imagesHtml = '<div style="height:90px; position:relative; width:100%; display:flex; justify-content:center; align-items:center;">';
+                if (p.sig) {
+                    // Tanda tangan di layer 1 (bawah)
+                    imagesHtml += `<img src="${p.sig}" style="height:80px; position:relative; z-index:10;" />`;
+                }
+                if (p.stamp) {
+                    // Stempel di layer 2 (atas), menimpa 1/4 bagian kanan tanda tangan
+                    imagesHtml += `<img src="${p.stamp}" style="height:80px; width:80px; object-fit:contain; position:absolute; z-index:50; margin-left:50px; margin-top:10px;" />`;
+                }
+                imagesHtml += '</div>';
+
+                let titleText = p.role === 'client' ? (p.mitra_name || p.name) : 'STIMATA';
+
                 sigBlock += `<div style="text-align:center;width:45%;">
-                    <p style="margin-bottom:20px;font-weight:bold;">Pihak ${i===0?'Pertama':'Kedua'}</p>
-                    ${p.sig ? `<img src="${p.sig}" style="height:80px;display:block;margin:0 auto;" />` : '<div style="height:80px;"></div>'}
+                    <p style="margin-bottom:20px;font-weight:bold;text-transform:uppercase;">${titleText}</p>
+                    ${imagesHtml}
                     <p style="margin-top:20px;font-weight:bold;text-decoration:underline;">${p.name}</p>
                 </div>`;
             });
             sigBlock += '</div>';
             el.insertAdjacentHTML('beforeend', sigBlock);
 
-            html2pdf().set({
-                margin: 0.75, // Margin 0.75 inci untuk seluruh sisi (kiri, kanan, atas, bawah)
-                filename: '{{ $doc->title }}.pdf',
-                image: {type:'jpeg',quality:0.98},
-                html2canvas: {
-                    scale: 2, 
-                    useCORS: true,
-                    // Trik jitu ke-3: Mencegah error 'oklch' dari Tailwind dengan cara 
-                    // mengabaikan semua tag <style> dan <link> saat html2canvas melakukan cloning.
-                    // Ini jauh lebih aman dan tidak menyebabkan tampilan utama berkedip.
-                    ignoreElements: function(element) {
-                        const tag = element.tagName ? element.tagName.toLowerCase() : '';
-                        return tag === 'style' || tag === 'link';
-                    }
-                },
-                jsPDF: {unit:'in',format:'letter',orientation:'portrait'}
-            }).from(el).save().catch(err => {
-                console.error('PDF Export Error:', err);
-                alert('Gagal membuat PDF: ' + (err.message || err));
-            });
+            if (typeof html2pdf !== 'undefined') {
+                html2pdf().set({
+                    margin: 0.75, // Margin 0.75 inci untuk seluruh sisi (kiri, kanan, atas, bawah)
+                    filename: '{{ $doc->title }}.pdf',
+                    image: {type:'jpeg',quality:0.98},
+                    html2canvas: {
+                        scale: 2, 
+                        useCORS: true,
+                        // Trik jitu ke-3: Mencegah error 'oklch' dari Tailwind dengan cara 
+                        // mengabaikan semua tag <style> dan <link> saat html2canvas melakukan cloning.
+                        // Ini jauh lebih aman dan tidak menyebabkan tampilan utama berkedip.
+                        ignoreElements: function(element) {
+                            const tag = element.tagName ? element.tagName.toLowerCase() : '';
+                            return tag === 'style' || tag === 'link';
+                        }
+                    },
+                    jsPDF: {unit:'in',format:'letter',orientation:'portrait'}
+                }).from(el).save().catch(err => {
+                    console.error('PDF Export Error:', err);
+                    alert('Gagal membuat PDF: ' + (err.message || err));
+                });
+            } else {
+                alert('Library html2pdf belum dimuat.');
+            }
         }
     }
 }

@@ -43,6 +43,8 @@
                 <tr>
                     <th class="px-6 py-4">User</th>
                     <th class="px-6 py-4">Email</th>
+                    <th class="px-6 py-4">Jabatan</th>
+                    <th class="px-6 py-4">Nama Mitra</th>
                     <th class="px-6 py-4">Role</th>
                     <th class="px-6 py-4">Terdaftar</th>
                     <th class="px-6 py-4 text-right">Aksi</th>
@@ -66,6 +68,8 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 font-mono text-xs">{{ $u->email }}</td>
+                    <td class="px-6 py-4 text-xs">{{ $u->jabatan ?: '-' }}</td>
+                    <td class="px-6 py-4 text-xs">{{ $u->nama_mitra ?: '-' }}</td>
                     <td class="px-6 py-4">
                         @php
                             $roleName = $u->roles->first()?->name ?? 'none';
@@ -77,12 +81,12 @@
                             };
                         @endphp
                         <span class="px-2 py-1 rounded-full text-xs font-medium {{ $roleClass }}">
-                            {{ strtoupper(str_replace('_', ' ', $roleName)) }}
+                            {{ strtoupper(str_replace('client', 'mitra', str_replace('_', ' ', $roleName))) }}
                         </span>
                     </td>
                     <td class="px-6 py-4 text-xs text-slate-500">{{ $u->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-4 text-right">
-                        <button @click="editUser({{ $u->id }}, '{{ addslashes($u->name) }}', '{{ $u->email }}', '{{ $roleName }}')" class="text-slate-400 hover:text-blue-600 transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button @click="editUser({{ $u->id }}, '{{ addslashes($u->name) }}', '{{ $u->email }}', '{{ addslashes($u->jabatan) }}', '{{ addslashes($u->nama_mitra) }}', '{{ $roleName }}')" class="text-slate-400 hover:text-blue-600 transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                         @if($u->id !== auth()->id())
                         <form method="POST" action="{{ route('users.destroy', $u->id) }}" class="inline" onsubmit="return confirm('Yakin ingin menghapus user ini?')">
                             @csrf @method('DELETE')
@@ -93,7 +97,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="5" class="px-6 py-8 text-center text-slate-400">Tidak ada user ditemukan</td>
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-400">Tidak ada user ditemukan</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -130,9 +134,17 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
                         <select name="role" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             @foreach($roles as $role)
-                            <option value="{{ $role->name }}">{{ strtoupper(str_replace('_', ' ', $role->name)) }}</option>
+                            <option value="{{ $role->name }}">{{ strtoupper(str_replace('client', 'mitra', str_replace('_', ' ', $role->name))) }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan <span class="text-xs text-slate-400 font-normal">(opsional)</span></label>
+                        <input type="text" name="jabatan" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Misal: Direktur">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nama Mitra / Instansi <span class="text-xs text-slate-400 font-normal">(khusus mitra)</span></label>
+                        <input type="text" name="nama_mitra" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nama organisasi atau perusahaan">
                     </div>
                 </div>
             </div>
@@ -168,9 +180,17 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
                         <select name="role" id="edit-role" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             @foreach($roles as $role)
-                            <option value="{{ $role->name }}">{{ strtoupper(str_replace('_', ' ', $role->name)) }}</option>
+                            <option value="{{ $role->name }}">{{ strtoupper(str_replace('client', 'mitra', str_replace('_', ' ', $role->name))) }}</option>
                             @endforeach
                         </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan <span class="text-xs text-slate-400 font-normal">(opsional)</span></label>
+                        <input type="text" name="jabatan" id="edit-jabatan" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Misal: Direktur">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nama Mitra / Instansi <span class="text-xs text-slate-400 font-normal">(khusus mitra)</span></label>
+                        <input type="text" name="nama_mitra" id="edit-nama-mitra" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nama organisasi atau perusahaan">
                     </div>
                 </div>
             </div>
@@ -187,10 +207,12 @@
 <script>
 function userPage() {
     return {
-        editUser(id, name, email, role) {
+        editUser(id, name, email, jabatan, nama_mitra, role) {
             document.getElementById('form-edit-user').action = '/users/' + id;
             document.getElementById('edit-name').value = name;
             document.getElementById('edit-email').value = email;
+            document.getElementById('edit-jabatan').value = jabatan;
+            document.getElementById('edit-nama-mitra').value = nama_mitra;
             document.getElementById('edit-role').value = role;
             document.getElementById('modal-edit-user').classList.remove('hidden');
         }
