@@ -19,13 +19,13 @@
     <table>
         <thead>
             <tr>
-                <th width="3%">No</th>
+                <th width="5%">No</th>
                 <th width="18%">Judul</th>
                 <th width="7%">Jenis</th>
                 <th width="12%">Nomor Dokumen</th>
                 <th width="12%">Mitra</th>
-                <th width="12%">Nama PIC</th>
-                <th width="12%">Unit</th>
+                <th width="11%">Nama PIC</th>
+                <th width="11%">Unit</th>
                 <th width="8%">Status</th>
                 <th width="8%">Tgl Mulai</th>
                 <th width="8%">Tgl Selesai</th>
@@ -44,7 +44,7 @@
                 <td class="text-center">{{ strtoupper($doc->type) }}</td>
                 <td>{{ $doc->document_number ?? '-' }}</td>
                 <td>{{ $doc->parties->where('role_type', 'client')->first()?->user->nama_mitra ?? '-' }}</td>
-                <td>{{ $doc->parties->where('role_type', 'unit_pengusul')->first()?->user->name ?? '-' }}</td>
+                <td>{{ $doc->parties->where('role_type', 'client')->first()?->user->name ?? '-' }}</td>
                 <td>{{ $doc->parties->where('role_type', 'unit_pengusul')->first()?->user->jabatan ?? '-' }}</td>
                 <td class="text-center">{{ strtoupper(str_replace('_', ' ', $doc->status)) }}</td>
                 <td>{{ $doc->start_date ? $doc->start_date->format('d M Y') : '-' }}</td>

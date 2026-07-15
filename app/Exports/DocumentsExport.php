@@ -65,7 +65,7 @@ class DocumentsExport implements FromCollection, WithHeadings, WithMapping
             $doc->document_number ?? '-',
             $doc->parent ? $doc->parent->title : '-',
             $client ? $client->user->nama_mitra : '-',
-            $unit ? $unit->user->name : '-',
+            $client ? $client->user->name : '-',
             $unit ? $unit->user->jabatan : '-',
             $doc->created_at->format('d M Y'),
             $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-',
