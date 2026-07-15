@@ -239,7 +239,7 @@
                     <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4">
                         @php
-                            $isExpired = $doc->end_date && \Carbon\Carbon::parse($doc->end_date)->isPast() && $doc->status == 'signed';
+                            $isExpired = $doc->status == 'expired' || ($doc->end_date && \Carbon\Carbon::parse($doc->end_date)->isPast() && $doc->status == 'signed');
                             if ($isExpired) {
                                 $statusClass = 'bg-red-100 text-red-700';
                                 $statusLabel = 'KADALUARSA';
@@ -276,7 +276,7 @@
                         @endif
                         @role('super_admin')
                         <button type="button"
-                            onclick="openEditDateModal({{ $doc->id }}, '{{ addslashes($doc->document_number) }}', '{{ $doc->start_date }}', '{{ $doc->end_date }}', '{{ addslashes($doc->title) }}')"
+                            onclick="openEditDateModal({{ $doc->id }}, '{{ addslashes($doc->document_number) }}', '{{ $doc->start_date ? $doc->start_date->format('Y-m-d') : '' }}', '{{ $doc->end_date ? $doc->end_date->format('Y-m-d') : '' }}', '{{ addslashes($doc->title) }}')"
                             class="text-slate-500 hover:text-slate-700 text-xs font-medium">
                             <i class="fa-solid fa-pen mr-1"></i> 
                         </button>
