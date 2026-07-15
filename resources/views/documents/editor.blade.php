@@ -40,7 +40,7 @@
     <!-- Editor Header -->
     <header class="border-b border-slate-200 px-6 py-3 flex justify-between items-center bg-white z-10 shrink-0">
         <div class="flex items-center gap-4">
-            <a href="{{ route('documents.index') }}" class="text-slate-500 hover:text-slate-800 transition">
+            <a href="{{ route('documents.index') }}" @click.prevent="navigateBack('{{ route('documents.index') }}')" class="text-slate-500 hover:text-slate-800 transition">
                 <i class="fa-solid fa-arrow-left"></i>
             </a>
             <div>
@@ -49,7 +49,7 @@
                     <span class="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200">
                         {{ $statusLabel }}
                     </span>
-                    <span>Last saved: {{ $doc->updated_at->format('H:i:s') }}</span>
+                    <span>Terakhir disimpan: {{ $doc->updated_at->format('H:i:s') }}</span>
                 </div>
             </div>
         </div>
@@ -96,11 +96,11 @@
             @if($doc->status === 'signed')
                 @if($doc->file_path)
                 <a href="{{ route('documents.preview', ['id' => $doc->id]) }}" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm ml-2 transition inline-flex items-center">
-                    <i class="fa-solid fa-file-pdf mr-1"></i> Download PDF
+                    <i class="fa-solid fa-file-pdf mr-1"></i> Unduh PDF
                 </a>
                 @else
                 <button @click="exportPdf()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm ml-2 transition">
-                    <i class="fa-solid fa-file-pdf mr-1"></i> Export PDF
+                    <i class="fa-solid fa-file-pdf mr-1"></i> Ekspor PDF
                 </button>
                 @endif
             @endif
@@ -126,7 +126,7 @@
                         </a>
                         <a href="{{ $pdfUrl }}" download
                            class="text-xs px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded-md transition flex items-center gap-1.5">
-                            <i class="fa-solid fa-download text-[11px]"></i> Download
+                            <i class="fa-solid fa-download text-[11px]"></i> Unduh
                         </a>
                     </div>
                 </div>
@@ -151,7 +151,7 @@
                             <i class="fa-solid fa-arrow-up-right-from-square mr-2"></i> Buka di Tab Baru
                         </a>
                         <a href="{{ $pdfUrl }}" download class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm rounded-lg font-medium transition">
-                            <i class="fa-solid fa-download mr-2"></i> Download PDF
+                            <i class="fa-solid fa-download mr-2"></i> Unduh PDF
                         </a>
                     </div>
                 </div>
@@ -272,6 +272,35 @@
     </div>
 
     @include('documents.partials.editor-modals')
+
+    {{-- Modal Konfirmasi Perubahan Belum Tersimpan --}}
+    <div x-show="showUnsavedModal" x-cloak class="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden" @click.away="cancelLeave()" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100">
+            <div class="px-6 pt-6 pb-4">
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                        <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-semibold text-slate-900">Perubahan Belum Tersimpan</h3>
+                        <p class="text-sm text-slate-500">Anda memiliki perubahan yang belum disimpan.</p>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-600 mt-2">Apakah Anda ingin menyimpan perubahan sebelum keluar dari halaman ini?</p>
+            </div>
+            <div class="bg-slate-50 px-6 py-3 flex justify-end gap-2">
+                <button @click="cancelLeave()" class="px-4 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition">
+                    Batal
+                </button>
+                <button @click="discardAndLeave()" class="px-4 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition">
+                    <i class="fa-solid fa-trash-can mr-1"></i> Buang Perubahan
+                </button>
+                <button @click="confirmSaveAndLeave()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm transition">
+                    <i class="fa-regular fa-floppy-disk mr-1"></i> Simpan & Keluar
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="/vendor/tinymce/tinymce.min.js"></script>
@@ -282,6 +311,9 @@ function editorPage() {
         docId: {{ $doc->id }},
         showSignModal: false,
         showSendModal: false,
+        showUnsavedModal: false,
+        pendingNavigationUrl: null,
+        isDirty: false,
         allowUpload: false,
         signaturePreview: null,
         signatureFile: null,
@@ -431,6 +463,11 @@ function editorPage() {
                     editor.ui.registry.addContextMenu('selection', {
                         update: () => !editor.selection.isCollapsed() ? 'addcomment' : ''
                     });
+
+                    // Tambahkan shortcut ctrl+s ke dalam editor iframe
+                    editor.addShortcut('meta+s', 'Simpan dokumen', () => {
+                        this.saveContent(true);
+                    });
                 };
 
                 let toolbarConfig = false;
@@ -479,6 +516,36 @@ function editorPage() {
                     setup: customSetup
                 });
 
+                // Track dirty state via TinyMCE change events
+                if (canEdit) {
+                    const self = this;
+                    const checkDirty = () => {
+                        const ed = tinymce.get('editor-area');
+                        if (ed) {
+                            ed.on('change input keyup', () => { self.isDirty = true; });
+                        } else {
+                            setTimeout(checkDirty, 200);
+                        }
+                    };
+                    checkDirty();
+                }
+
+                // Browser tab close / reload guard
+                window.addEventListener('beforeunload', (e) => {
+                    if (this.isDirty) {
+                        e.preventDefault();
+                        e.returnValue = '';
+                    }
+                });
+
+                // Ctrl+S shortcut untuk simpan dokumen
+                document.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+                        e.preventDefault();
+                        this.saveContent(true);
+                    }
+                });
+
                 window.addEventListener('init-comment', (e) => {
                     this.activeCommentAnchor = e.detail.id;
                     this.activeCommentQuote = e.detail.text;
@@ -492,6 +559,68 @@ function editorPage() {
             }
         },
 
+        showToast(message, type = 'success') {
+            // Remove existing toast
+            document.getElementById('save-toast')?.remove();
+
+            const iconMap = {
+                success: 'fa-circle-check text-green-500',
+                info: 'fa-circle-info text-blue-500',
+                warning: 'fa-triangle-exclamation text-amber-500',
+            };
+            const bgMap = {
+                success: 'bg-green-50 border-green-200',
+                info: 'bg-blue-50 border-blue-200',
+                warning: 'bg-amber-50 border-amber-200',
+            };
+
+            const toast = document.createElement('div');
+            toast.id = 'save-toast';
+            toast.className = `fixed top-5 right-5 z-[200] flex items-center gap-3 px-5 py-3 rounded-xl border shadow-lg ${bgMap[type] || bgMap.success} transition-all duration-300 opacity-0 translate-y-[-10px]`;
+            toast.innerHTML = `<i class="fa-solid ${iconMap[type] || iconMap.success} text-lg"></i><span class="text-sm font-medium text-slate-800">${message}</span>`;
+            document.body.appendChild(toast);
+
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('opacity-0', 'translate-y-[-10px]');
+                toast.classList.add('opacity-100', 'translate-y-0');
+            });
+
+            // Animate out after 2.5s
+            setTimeout(() => {
+                toast.classList.remove('opacity-100', 'translate-y-0');
+                toast.classList.add('opacity-0', 'translate-y-[-10px]');
+                setTimeout(() => toast.remove(), 300);
+            }, 2500);
+        },
+
+        navigateBack(url) {
+            if (this.isDirty) {
+                this.pendingNavigationUrl = url;
+                this.showUnsavedModal = true;
+            } else {
+                window.location.href = url;
+            }
+        },
+
+        async confirmSaveAndLeave() {
+            await this.saveContent(false);
+            this.isDirty = false;
+            this.showUnsavedModal = false;
+            window.location.href = this.pendingNavigationUrl;
+        },
+
+        discardAndLeave() {
+            this.isDirty = false;
+            this.showUnsavedModal = false;
+            window.location.href = this.pendingNavigationUrl;
+        },
+
+        cancelLeave() {
+            this.pendingNavigationUrl = null;
+            this.showUnsavedModal = false;
+        },
+
         async saveContent(showAlertAndReload = true) {
             if (!document.getElementById('editor-area')) return;
             const editor = tinymce.get('editor-area');
@@ -502,29 +631,30 @@ function editorPage() {
                 headers: {'Content-Type':'application/json','X-CSRF-TOKEN':this.csrfToken},
                 body: JSON.stringify({content})
             });
-            if (res.ok && showAlertAndReload) {
-                const saveBtn = document.querySelector('button[\\@click="saveContent()"]');
-                if (saveBtn) {
-                    const oldHtml = saveBtn.innerHTML;
-                    saveBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Tersimpan';
-                    saveBtn.classList.add('text-green-600');
-                    setTimeout(() => {
-                        saveBtn.innerHTML = oldHtml;
-                        saveBtn.classList.remove('text-green-600');
-                    }, 2000);
-                }
-                
-                const user_name = @json(Auth::user()->name ?? 'User');
-                const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
-                if(historyContainer) {
-                    const hHtml = `
-                    <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
-                        <div class="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
-                        <div class="text-xs text-slate-400 mb-1">Baru saja</div>
-                        <div class="text-sm font-medium text-slate-800">${user_name}</div>
-                        <div class="text-xs text-slate-600 mt-1">Konten diperbarui</div>
-                    </div>`;
-                    historyContainer.insertAdjacentHTML('afterbegin', hHtml);
+            if (res.ok) {
+                this.isDirty = false;
+                const data = await res.json();
+
+                if (showAlertAndReload) {
+                    if (data.changed) {
+                        this.showToast('Dokumen berhasil disimpan', 'success');
+
+                        // Tambah entry history di sidebar hanya jika konten berubah
+                        const user_name = @json(Auth::user()->name ?? 'User');
+                        const historyContainer = document.querySelector(`[x-show="activeTab==='history'"]`);
+                        if(historyContainer) {
+                            const hHtml = `
+                            <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
+                                <div class="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
+                                <div class="text-xs text-slate-400 mb-1">Baru saja</div>
+                                <div class="text-sm font-medium text-slate-800">${user_name}</div>
+                                <div class="text-xs text-slate-600 mt-1">Konten diperbarui</div>
+                            </div>`;
+                            historyContainer.insertAdjacentHTML('afterbegin', hHtml);
+                        }
+                    } else {
+                        this.showToast('Tidak ada perubahan untuk disimpan', 'info');
+                    }
                 }
             }
         },

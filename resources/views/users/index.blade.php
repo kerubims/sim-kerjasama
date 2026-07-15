@@ -1,11 +1,11 @@
 @extends('layouts.app')
 
-@section('title', 'Manajemen User')
-@section('page-title', 'Manajemen User')
+@section('title', 'Manajemen Pengguna')
+@section('page-title', 'Manajemen Pengguna')
 
 @section('header-actions')
 <button onclick="document.getElementById('modal-add-user').classList.remove('hidden')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">
-    <i class="fa-solid fa-plus mr-2"></i> Tambah User
+    <i class="fa-solid fa-plus mr-2"></i> Tambah Pengguna
 </button>
 @endsection
 
@@ -33,7 +33,7 @@
         @if(request('search'))
         <a href="{{ route('users.index') }}" class="text-sm text-slate-500 hover:text-slate-700"><i class="fa-solid fa-times mr-1"></i>Reset</a>
         @endif
-        <div class="ml-auto text-sm text-slate-500">Total: <span class="font-semibold text-slate-700">{{ $users->total() }}</span> user</div>
+        <div class="ml-auto text-sm text-slate-500">Total: <span class="font-semibold text-slate-700">{{ $users->total() }}</span> pengguna</div>
     </div>
 
     {{-- Table --}}
@@ -41,7 +41,7 @@
         <table class="w-full text-left text-sm text-slate-600">
             <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
                 <tr>
-                    <th class="px-6 py-4">User</th>
+                    <th class="px-6 py-4">Pengguna</th>
                     <th class="px-6 py-4">Email</th>
                     <th class="px-6 py-4">Jabatan</th>
                     <th class="px-6 py-4">Nama Mitra</th>
@@ -88,7 +88,7 @@
                     <td class="px-6 py-4 text-right">
                         <button @click="editUser({{ $u->id }}, '{{ addslashes($u->name) }}', '{{ $u->email }}', '{{ addslashes($u->jabatan) }}', '{{ addslashes($u->nama_mitra) }}', '{{ $roleName }}')" class="text-slate-400 hover:text-blue-600 transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                         @if($u->id !== auth()->id())
-                        <form method="POST" action="{{ route('users.destroy', $u->id) }}" class="inline" onsubmit="return confirm('Yakin ingin menghapus user ini?')">
+                        <form method="POST" action="{{ route('users.destroy', $u->id) }}" class="inline" onsubmit="return confirm('Yakin ingin menghapus pengguna ini?')">
                             @csrf @method('DELETE')
                             <button type="submit" class="text-slate-400 hover:text-red-600 ml-3 transition" title="Hapus"><i class="fa-solid fa-trash"></i></button>
                         </form>
@@ -97,7 +97,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="7" class="px-6 py-8 text-center text-slate-400">Tidak ada user ditemukan</td>
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-400">Tidak ada pengguna ditemukan</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -116,7 +116,7 @@
         <form action="{{ route('users.store') }}" method="POST">
             @csrf
             <div class="px-6 py-5">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4"><i class="fa-solid fa-user-plus mr-2 text-blue-600"></i>Tambah User Baru</h3>
+                <h3 class="text-lg font-semibold text-slate-900 mb-4"><i class="fa-solid fa-user-plus mr-2 text-blue-600"></i>Tambah Pengguna Baru</h3>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>
@@ -162,7 +162,7 @@
         <form id="form-edit-user" method="POST">
             @csrf @method('PUT')
             <div class="px-6 py-5">
-                <h3 class="text-lg font-semibold text-slate-900 mb-4"><i class="fa-solid fa-user-pen mr-2 text-blue-600"></i>Edit User</h3>
+                <h3 class="text-lg font-semibold text-slate-900 mb-4"><i class="fa-solid fa-user-pen mr-2 text-blue-600"></i>Edit Pengguna</h3>
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nama Lengkap</label>

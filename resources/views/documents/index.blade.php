@@ -199,14 +199,13 @@
                     <th class="px-6 py-4">Judul</th>
                     <th class="px-6 py-4">Jenis</th>
                     <th class="px-6 py-4">Mitra</th>
-                    <th class="px-6 py-4">Nama PIC</th>
-                    <th class="px-6 py-4">Jabatan PIC</th>
+                    <th class="px-6 py-4">Nama PIC</th>                    
                     <th class="px-6 py-4">Unit</th>
                     <th class="px-6 py-4">Tanggal Dibuat</th>
                     <th class="px-6 py-4">Tanggal Mulai</th>
                     <th class="px-6 py-4">Tanggal Selesai</th>
                     <th class="px-6 py-4">Status</th>
-                    <th class="px-6 py-4 text-right">Aksi</th>
+                    <th class="px-6 py-4 text-center">Aksi</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
@@ -234,7 +233,6 @@
                     </td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-4">{{ $doc->start_date ? \Carbon\Carbon::parse($doc->start_date)->format('d M Y') : '-' }}</td>
@@ -265,14 +263,14 @@
                     <td class="px-6 py-4 text-right whitespace-nowrap">
                         @if($doc->file_path)
                             <a href="{{ route('documents.preview', ['id' => $doc->id]) }}" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">
-                                <i class="fa-solid fa-eye mr-1"></i> Lihat PDF
+                                <i class="fa-solid fa-eye mr-1"></i>
                             </a>
                         @else
                             <a href="{{ route('documents.editor', ['id' => $doc->id]) }}" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">
                                 @if($doc->status == 'signed' || $isExpired)
-                                    <i class="fa-solid fa-eye mr-1"></i> Lihat
+                                    <i class="fa-solid fa-eye mr-1"></i> 
                                 @else
-                                    <i class="fa-solid fa-pen-to-square mr-1"></i> Edit
+                                    <i class="fa-solid fa-pen-to-square mr-1"></i> 
                                 @endif
                             </a>
                         @endif
@@ -280,7 +278,12 @@
                         <button type="button"
                             onclick="openEditDateModal({{ $doc->id }}, '{{ addslashes($doc->document_number) }}', '{{ $doc->start_date }}', '{{ $doc->end_date }}', '{{ addslashes($doc->title) }}')"
                             class="text-slate-500 hover:text-slate-700 text-xs font-medium">
-                            <i class="fa-solid fa-pen mr-1"></i> Data
+                            <i class="fa-solid fa-pen mr-1"></i> 
+                        </button>
+                        <button type="button"
+                            onclick="openDeleteModal({{ $doc->id }}, '{{ addslashes($doc->title) }}')"
+                            class="text-red-500 hover:text-red-700 text-xs font-medium ml-3">
+                            <i class="fa-solid fa-trash mr-1"></i> 
                         </button>
                         @endrole
                     </td>
@@ -456,6 +459,30 @@
             <div class="bg-slate-50 px-6 py-3 flex flex-row-reverse gap-3">
                 <button type="submit" id="btn-save-dates" class="inline-flex justify-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 transition">Simpan Perubahan</button>
                 <button type="button" onclick="document.getElementById('modal-edit-date').classList.add('hidden')" class="inline-flex justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition">Batal</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Delete Document -->
+<div id="modal-delete-doc" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm flex">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+        <form id="form-delete-doc">
+            <input type="hidden" id="delete-doc-id">
+            <div class="bg-white px-6 pt-6 pb-4">
+                <h3 class="text-base font-semibold text-red-600 mb-1">
+                    <i class="fa-solid fa-triangle-exclamation mr-1"></i> Konfirmasi Hapus
+                </h3>
+                <p class="text-sm text-slate-600 mb-4">Anda akan menghapus dokumen <strong id="delete-doc-title"></strong>. Tindakan ini tidak dapat dibatalkan.</p>
+                <div id="delete-doc-error" class="hidden mb-3 bg-red-50 border border-red-200 text-red-600 px-3 py-2 rounded-lg text-sm"></div>
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Ketik "konfirmasi" untuk melanjutkan</label>
+                    <input type="text" id="delete-confirmation-text" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500 text-sm" placeholder="konfirmasi">
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-3 flex flex-row-reverse gap-3">
+                <button type="submit" id="btn-delete-doc" disabled class="inline-flex justify-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500 transition disabled:opacity-50 disabled:cursor-not-allowed">Hapus Dokumen</button>
+                <button type="button" onclick="document.getElementById('modal-delete-doc').classList.add('hidden')" class="inline-flex justify-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-900 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition">Batal</button>
             </div>
         </form>
     </div>
@@ -700,6 +727,58 @@ document.getElementById('form-edit-date').addEventListener('submit', async funct
     } finally {
         btn.disabled = false;
         btn.textContent = 'Simpan Perubahan';
+    }
+});
+
+// Delete Document Modal
+function openDeleteModal(docId, title) {
+    document.getElementById('delete-doc-id').value = docId;
+    document.getElementById('delete-doc-title').textContent = title;
+    document.getElementById('delete-confirmation-text').value = '';
+    document.getElementById('btn-delete-doc').disabled = true;
+    document.getElementById('delete-doc-error').classList.add('hidden');
+    document.getElementById('modal-delete-doc').classList.remove('hidden');
+}
+
+document.getElementById('delete-confirmation-text').addEventListener('input', function() {
+    document.getElementById('btn-delete-doc').disabled = this.value.toLowerCase() !== 'konfirmasi';
+});
+
+document.getElementById('form-delete-doc').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const docId = document.getElementById('delete-doc-id').value;
+    const btn = document.getElementById('btn-delete-doc');
+    const errEl = document.getElementById('delete-doc-error');
+
+    btn.disabled = true;
+    btn.textContent = 'Menghapus...';
+    errEl.classList.add('hidden');
+
+    try {
+        const res = await fetch(`/documents/${docId}`, {
+            method: 'DELETE',
+            headers: {
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
+                'Accept': 'application/json',
+            }
+        });
+
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+            document.getElementById('modal-delete-doc').classList.add('hidden');
+            window.location.reload();
+        } else {
+            errEl.textContent = data.message || 'Gagal menghapus dokumen.';
+            errEl.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Hapus Dokumen';
+        }
+    } catch (err) {
+        errEl.textContent = 'Gagal terhubung ke server. Silakan coba lagi.';
+        errEl.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'Hapus Dokumen';
     }
 });
 </script>

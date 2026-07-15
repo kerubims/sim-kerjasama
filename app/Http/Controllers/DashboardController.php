@@ -27,7 +27,7 @@ class DashboardController extends Controller
 
         $documents = (clone $baseQuery)->with(['parties.user', 'parent'])
             ->orderBy('created_at', 'desc')
-            ->paginate(10);
+            ->paginate(10)->withQueryString();
 
         $stats = [];
         $chartData = [];
@@ -44,10 +44,11 @@ class DashboardController extends Controller
                 'expired' => Document::where('end_date', '<', now())->count(),
             ];
 
-            // Bar Chart: Tren MoU & MoA per bulan (Tahun ini)
+            // Bar Chart: Tren MoU & MoA per bulan
+            $selectedYear = $request->input('year', date('Y'));
             $mouData = array_fill(0, 12, 0);
             $moaData = array_fill(0, 12, 0);
-            $docsThisYear = Document::whereYear('created_at', date('Y'))->get();
+            $docsThisYear = Document::whereYear('created_at', $selectedYear)->get();
             foreach ($docsThisYear as $doc) {
                 $month = (int)$doc->created_at->format('n') - 1;
                 if (strtolower($doc->type) === 'mou') $mouData[$month]++;
@@ -74,5 +75,28 @@ class DashboardController extends Controller
         }
 
         return view('dashboard', compact('stats', 'documents', 'chartData', 'isSuperAdmin'));
+    }
+
+    public function getChartData(Request $request)
+    {
+        if (!Auth::user()->hasRole('super_admin')) {
+            return response()->json(['error' => 'Unauthorized'], 403);
+        }
+
+        $selectedYear = $request->input('year', date('Y'));
+        $mouData = array_fill(0, 12, 0);
+        $moaData = array_fill(0, 12, 0);
+        $docsThisYear = Document::whereYear('created_at', $selectedYear)->get();
+        
+        foreach ($docsThisYear as $doc) {
+            $month = (int)$doc->created_at->format('n') - 1;
+            if (strtolower($doc->type) === 'mou') $mouData[$month]++;
+            if (strtolower($doc->type) === 'moa') $moaData[$month]++;
+        }
+        
+        return response()->json([
+            'mou' => $mouData,
+            'moa' => $moaData
+        ]);
     }
 }

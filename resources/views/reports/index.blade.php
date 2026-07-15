@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Export Laporan')
-@section('page-title', 'Export Laporan Kerjasama')
+@section('title', 'Ekspor Laporan')
+@section('page-title', 'Ekspor Laporan Kerjasama')
 
 @section('content')
 <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
@@ -52,7 +52,7 @@
     <div class="bg-gradient-to-br from-green-500 to-green-600 p-5 rounded-xl shadow-lg text-white">
         <div class="flex items-center justify-between">
             <div>
-                <div class="text-sm text-green-100">Aktif/Signed</div>
+                <div class="text-sm text-green-100">Aktif</div>
                 <div class="text-3xl font-bold mt-1">{{ $stats['active'] }}</div>
             </div>
             <div class="w-12 h-12 bg-white/10 rounded-full flex items-center justify-center">
@@ -109,9 +109,9 @@
             <label class="block text-sm font-medium text-slate-700 mb-1">Unit</label>
             <select name="unit" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                 <option value="">Semua Unit</option>
-                <option value="ti">Unit TI</option>
-                <option value="fk">Unit FK</option>
-                <option value="fkip">Unit FKIP</option>
+                @foreach($units as $unitValue => $unitLabel)
+                    <option value="{{ $unitValue }}" {{ request('unit') == $unitValue ? 'selected' : '' }}>{{ $unitLabel }}</option>
+                @endforeach
             </select>
         </div>
         <div class="flex items-end gap-2" x-data>
@@ -144,20 +144,20 @@
 <!-- Export Buttons -->
 <div class="flex gap-3 mb-6" x-data>
     <a href="{{ route('reports.export-pdf', request()->all()) }}" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
-        <i class="fa-solid fa-file-pdf mr-2"></i> Export PDF
+        <i class="fa-solid fa-file-pdf mr-2"></i> Ekspor PDF
     </a>
     <a href="{{ route('reports.export-excel', request()->all()) }}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
-        <i class="fa-solid fa-file-excel mr-2"></i> Export Excel
+        <i class="fa-solid fa-file-excel mr-2"></i> Ekspor Excel
     </a>
     <button @click="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition">
-        <i class="fa-solid fa-print mr-2"></i> Print
+        <i class="fa-solid fa-print mr-2"></i> Cetak
     </button>
 </div>
 
 <!-- Preview Table -->
 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="p-4 border-b border-slate-100 flex items-center justify-between">
-        <h3 class="font-bold text-slate-800">Preview Laporan</h3>
+        <h3 class="font-bold text-slate-800">Pratinjau Laporan</h3>
         <span class="text-xs text-slate-500">Menampilkan {{ $recentDocs->count() }} data terbaru sesuai filter</span>
     </div>
     <div class="overflow-x-auto">
@@ -188,7 +188,7 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-3">{{ $doc->parties->where('role_type', 'client')->first()->user->name ?? '-' }}</td>
+                    <td class="px-6 py-3">{{ $doc->parties->where('role_type', 'client')->first()?->user->nama_mitra ?? '-' }}</td>
                     <td class="px-6 py-3">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-3">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-3">
@@ -223,7 +223,7 @@ document.addEventListener('DOMContentLoaded', function() {
         type: 'doughnut',
         data: {
             labels: ['Aktif', 'Draft', 'Review', 'Kedaluwarsa'],
-            datasets: [{ data: [{{ $stats['active'] }}, {{ \App\Models\Document::where('status', 'draft')->count() }}, {{ \App\Models\Document::whereIn('status', ['review_client', 'review_unit'])->count() }}, {{ \App\Models\Document::where('status', 'expired')->count() }}], backgroundColor: ['#22c55e', '#94a3b8', '#f59e0b', '#ef4444'], borderWidth: 0 }]
+            datasets: [{ data: [{{ $stats['active'] }}, {{ $stats['draft'] }}, {{ $stats['review'] }}, {{ $stats['expired'] }}], backgroundColor: ['#22c55e', '#94a3b8', '#f59e0b', '#ef4444'], borderWidth: 0 }]
         },
         options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, padding: 15, font: { size: 11 } } } } }
     });

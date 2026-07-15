@@ -16,12 +16,12 @@
 
     <!-- Navigation -->
     <div class="px-4 py-2">
-        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">System</div>
+        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Sistem</div>
         <nav class="space-y-1">
             <a href="{{ route('dashboard') }}"
                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
                       {{ $currentRoute === 'dashboard' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
-                <i class="fa-solid fa-chart-pie w-5"></i> Dashboard
+                <i class="fa-solid fa-chart-pie w-5"></i> Beranda
             </a>
 
             @role('super_admin')
@@ -33,17 +33,17 @@
             <a href="{{ route('tracking.index') }}"
                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
                       {{ $currentRoute === 'tracking.index' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
-                <i class="fa-solid fa-diagram-project w-5"></i> Tracking Dokumen
+                <i class="fa-solid fa-diagram-project w-5"></i> Pelacakan Dokumen
             </a>
             <a href="{{ route('reports.index') }}"
                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
                       {{ $currentRoute === 'reports.index' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
-                <i class="fa-solid fa-file-export w-5"></i> Export Laporan
+                <i class="fa-solid fa-file-export w-5"></i> Ekspor Laporan
             </a>
             <a href="{{ route('users.index') }}"
                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
                       {{ str_starts_with($currentRoute, 'users') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
-                <i class="fa-solid fa-users w-5"></i> Users
+                <i class="fa-solid fa-users w-5"></i> Pengguna
             </a>
             @endrole
         </nav>
@@ -60,7 +60,7 @@
             </div>
             <form method="POST" action="{{ route('logout') }}">
                 @csrf
-                <button type="submit" class="text-slate-400 hover:text-red-500 transition" title="Logout">
+                <button type="submit" class="text-slate-400 hover:text-red-500 transition" title="Keluar">
                     <i class="fa-solid fa-right-from-bracket"></i>
                 </button>
             </form>

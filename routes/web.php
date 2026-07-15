@@ -12,6 +12,8 @@ use Illuminate\Support\Facades\Storage;
 use Gotenberg\Gotenberg;
 use Gotenberg\Stream;
 
+Route::get('/test-pdf-export', [ReportController::class, 'exportPdf']);
+
 Route::get('/', function () {
     return redirect()->route('login');
 });
@@ -19,25 +21,26 @@ Route::get('/', function () {
 Route::get('/dashboard', [DashboardController::class, 'index'])->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::middleware(['auth'])->group(function () {
-    // Profile
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 
     // Documents - accessible by all authenticated users
     Route::get('/documents', [DocumentController::class, 'index'])->name('documents.index');
 
     // Documents (Super Admin only)
     Route::middleware(['role:super_admin'])->group(function () {
+        Route::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'])->name('dashboard.chart-data');
         Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
         Route::put('/documents/{id}/dates', [DocumentController::class, 'updateDates'])->name('documents.updateDates');
+        Route::delete('/documents/{id}', [DocumentController::class, 'destroy'])->name('documents.destroy');
 
         Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking.index');
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
-        Route::get('/reports/export-pdf', [ReportController::class, 'exportPdf'])->name('reports.export-pdf');
-        Route::get('/reports/export-excel', [ReportController::class, 'exportExcel'])->name('reports.export-excel');
+    });
 
+    Route::get('/reports/export-pdf', [App\Http\Controllers\ReportController::class, 'exportPdf'])->name('reports.export-pdf');
+    Route::get('/reports/export-excel', [App\Http\Controllers\ReportController::class, 'exportExcel'])->name('reports.export-excel');
+
+    Route::middleware(['auth', 'verified'])->group(function () {
         Route::get('/users', [UserController::class, 'index'])->name('users.index');
         Route::post('/users', [UserController::class, 'store'])->name('users.store');
         Route::put('/users/{id}', [UserController::class, 'update'])->name('users.update');

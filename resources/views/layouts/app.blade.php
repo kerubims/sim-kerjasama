@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>@yield('title', 'Dashboard') — SIM-KERMA</title>
+    <title>@yield('title', 'Beranda') — SIM-KERMA</title>
     <meta name="description" content="Sistem Administrasi Kerjasama - Manajemen dokumen kerjasama universitas" />
 
     <!-- Google Fonts -->
@@ -89,6 +89,24 @@
 
     @stack('scripts')
 
+    @if(session('error'))
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.dispatchEvent(new CustomEvent('toast', {
+                detail: { type: 'error', message: @json(session('error')) }
+            }));
+        });
+    </script>
+    @endif
+    @if(session('success'))
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.dispatchEvent(new CustomEvent('toast', {
+                detail: { type: 'success', message: @json(session('success')) }
+            }));
+        });
+    </script>
+    @endif
     <script>
         function toastNotification() {
             return {

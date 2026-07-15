@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard')
-@section('page-title', 'Dashboard Overview')
+@section('title', 'Beranda')
+@section('page-title', 'Ringkasan Beranda')
 
 @section('content')
 @php
@@ -103,9 +103,13 @@
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 lg:col-span-2">
         <div class="flex justify-between items-center mb-6">
             <h3 class="font-bold text-slate-800">Tren Kerjasama (MoU & MoA)</h3>
-            <select class="text-xs border-none bg-slate-50 rounded px-2 py-1 text-slate-600 focus:ring-0 cursor-pointer">
-                <option>Tahun Ini</option>
-                <option>Tahun Lalu</option>
+            <select id="trendYearSelector" class="text-xs border-none bg-slate-50 rounded px-2 py-1 text-slate-600 focus:ring-0 cursor-pointer" onchange="updateChart(this.value)">
+                @for ($i = 0; $i < 5; $i++)
+                    @php $y = date('Y') - $i; @endphp
+                    <option value="{{ $y }}" {{ request('year', date('Y')) == $y ? 'selected' : '' }}>
+                        {{ $i == 0 ? 'Tahun Ini (' . $y . ')' : ($i == 1 ? 'Tahun Lalu (' . $y . ')' : $y) }}
+                    </option>
+                @endfor
             </select>
         </div>
         <div class="h-64">
@@ -115,7 +119,7 @@
 
     <!-- Donut Chart -->
     <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-        <h3 class="font-bold text-slate-800 mb-6">Kategori Mitra</h3>
+        <h3 class="font-bold text-slate-800 mb-6">Jenis Dokumen</h3>
         <div class="h-48 relative flex justify-center">
             <canvas id="donutChart"></canvas>
         </div>
@@ -128,7 +132,7 @@
 </div>
 @endif
 
-<!-- Recent Documents Table -->
+<!-- Tabel Dokumen Terbaru -->
 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
     <div class="p-6 border-b border-slate-100 flex justify-between items-center">
         <h3 class="font-bold text-slate-800">
@@ -148,7 +152,6 @@
                     <th class="px-6 py-4">Judul</th>
                     <th class="px-6 py-4">Jenis</th>
                     <th class="px-6 py-4">Mitra</th>
-                    <th class="px-6 py-4">Jabatan PIC</th>
                     <th class="px-6 py-4">Nama PIC</th>
                     <th class="px-6 py-4">Unit</th>
                     <th class="px-6 py-4">Tanggal Dibuat</th>
@@ -180,10 +183,9 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4">
@@ -211,7 +213,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="px-6 py-8 text-center text-slate-400">Belum ada dokumen</td>
+                    <td colspan="10" class="px-6 py-8 text-center text-slate-400">Belum ada dokumen</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -234,10 +236,12 @@ document.addEventListener('DOMContentLoaded', function() {
     @if($isSuperAdmin)
     const chartData = @json($chartData);
 
+    let barChartInstance = null;
+
     // Bar Chart - Tren Kerjasama
     const barCtx = document.getElementById('barChart');
     if (barCtx && chartData.bar) {
-        new Chart(barCtx, {
+        barChartInstance = new Chart(barCtx, {
             type: 'bar',
             data: {
                 labels: ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'],
@@ -266,6 +270,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+    }
+
+    window.updateChart = function(year) {
+        if (!barChartInstance) return;
+        
+        // Use Fetch API to get data without reloading the page
+        fetch(`{{ route('dashboard.chart-data') }}?year=${year}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) {
+                    console.error(data.error);
+                    return;
+                }
+                
+                // Update dataset with new data
+                barChartInstance.data.datasets[0].data = data.mou;
+                barChartInstance.data.datasets[1].data = data.moa;
+                barChartInstance.update();
+            })
+            .catch(err => console.error('Error fetching chart data:', err));
     }
 
     // Donut Chart - Kategori Mitra

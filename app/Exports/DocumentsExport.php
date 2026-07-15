@@ -24,6 +24,14 @@ class DocumentsExport implements FromCollection, WithHeadings, WithMapping
         if (!empty($this->filters['end_date'])) $query->whereDate('created_at', '<=', $this->filters['end_date']);
         if (!empty($this->filters['type'])) $query->where('type', strtolower($this->filters['type']));
         if (!empty($this->filters['status'])) $query->where('status', strtolower($this->filters['status']));
+        if (!empty($this->filters['unit'])) {
+            $query->whereHas('parties', function($q) {
+                $q->where('role_type', 'unit_pengusul')
+                  ->whereHas('user', function($uq) {
+                      $uq->where('jabatan', $this->filters['unit']);
+                  });
+            });
+        }
 
         return $query->orderBy('created_at', 'desc')->get();
     }
@@ -37,7 +45,6 @@ class DocumentsExport implements FromCollection, WithHeadings, WithMapping
             'Nomor Dokumen',
             'Rujukan',
             'Mitra',
-            'Jabatan PIC',
             'Nama PIC',
             'Unit Pengusul',
             'Tanggal Dibuat',
@@ -57,10 +64,9 @@ class DocumentsExport implements FromCollection, WithHeadings, WithMapping
             strtoupper($doc->type),
             $doc->document_number ?? '-',
             $doc->parent ? $doc->parent->title : '-',
-            $client ? $client->user->name : '-',
-            $client ? $client->user->jabatan : '-',
             $client ? $client->user->nama_mitra : '-',
             $unit ? $unit->user->name : '-',
+            $unit ? $unit->user->jabatan : '-',
             $doc->created_at->format('d M Y'),
             $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-',
             strtoupper(str_replace('_', ' ', $doc->status)),

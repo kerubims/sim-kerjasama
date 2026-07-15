@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Tracking Dokumen')
-@section('page-title', 'Tracking Dokumen')
+@section('title', 'Pelacakan Dokumen')
+@section('page-title', 'Pelacakan Dokumen')
 
 @section('content')
 <div class="space-y-6">
@@ -39,7 +39,7 @@
     <div x-data="{ openNodes: {} }" class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
         <h3 class="font-bold text-slate-800 mb-6 flex items-center gap-2">
             <i class="fa-solid fa-diagram-project text-blue-600"></i> Hierarki Dokumen Kerjasama
-            <span class="text-sm font-normal text-slate-500 ml-2">({{ $documents->count() }} root)</span>
+            <span class="text-sm font-normal text-slate-500 ml-2">({{ $documents->count() }} induk)</span>
         </h3>
 
         <div class="space-y-4">
@@ -71,8 +71,12 @@
             @endphp
             <div class="border border-slate-200 rounded-xl overflow-hidden">
                 <!-- MoU Level -->
-                <div class="{{ $rootUi['bg'] }} px-6 py-4 flex items-center gap-4 cursor-pointer" @click="openNodes['{{ $mouKey }}'] = !openNodes['{{ $mouKey }}']">
+                <div class="{{ $rootUi['bg'] }} px-6 py-4 flex items-center gap-4 {{ $mou->children->count() > 0 ? 'cursor-pointer' : '' }}" @if($mou->children->count() > 0) @click="openNodes['{{ $mouKey }}'] = !openNodes['{{ $mouKey }}']" @endif>
+                    @if($mou->children->count() > 0)
                     <i class="fa-solid fa-chevron-down text-slate-400 transition-transform text-sm" :class="{ 'rotate-180': !openNodes['{{ $mouKey }}'] }"></i>
+                    @else
+                    <i class="fa-solid fa-chevron-down invisible text-sm"></i>
+                    @endif
                     <div class="w-10 h-10 {{ $rootUi['iconBg'] }} rounded-lg flex items-center justify-center text-white">
                         <i class="fa-solid {{ $rootUi['icon'] }}"></i>
                     </div>
@@ -109,8 +113,12 @@
                         $moaClient = $moa->parties->where('role_type', 'client')->first()?->user?->name ?? '-';
                     @endphp
                     <div class="ml-8 border-l-2 border-blue-200">
-                        <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50 cursor-pointer" @click="openNodes['{{ $moaKey }}'] = !openNodes['{{ $moaKey }}']">
+                        <div class="pl-6 py-3 flex items-center gap-4 hover:bg-slate-50 {{ $moa->children->count() > 0 ? 'cursor-pointer' : '' }}" @if($moa->children->count() > 0) @click="openNodes['{{ $moaKey }}'] = !openNodes['{{ $moaKey }}']" @endif>
+                            @if($moa->children->count() > 0)
                             <i class="fa-solid fa-chevron-down text-purple-500 text-xs transition-transform" :class="{ 'rotate-180': !openNodes['{{ $moaKey }}'] }"></i>
+                            @else
+                            <i class="fa-solid fa-chevron-down invisible text-xs"></i>
+                            @endif
                             <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center text-white text-xs">
                                 <i class="fa-solid fa-file-signature"></i>
                             </div>

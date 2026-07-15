@@ -23,6 +23,11 @@ class Document extends Model
         'created_by',
     ];
 
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
+    ];
+
     public function parent()
     {
         return $this->belongsTo(Document::class, 'parent_id');

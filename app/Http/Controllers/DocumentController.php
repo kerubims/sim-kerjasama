@@ -280,16 +280,21 @@ class DocumentController extends Controller
             return response()->json(['success' => false, 'message' => 'Anda tidak memiliki izin untuk mengedit dokumen ini.'], 403);
         }
 
-        $document->update(['content' => $request->content]);
+        // Cek apakah konten benar-benar berubah
+        $contentChanged = $document->content !== $request->content;
 
-        DocumentHistory::create([
-            'document_id' => $document->id,
-            'user_id' => Auth::id(),
-            'action' => 'Edit',
-            'message' => 'Konten diperbarui'
-        ]);
+        if ($contentChanged) {
+            $document->update(['content' => $request->content]);
 
-        return response()->json(['success' => true]);
+            DocumentHistory::create([
+                'document_id' => $document->id,
+                'user_id' => Auth::id(),
+                'action' => 'Edit',
+                'message' => 'Konten diperbarui'
+            ]);
+        }
+
+        return response()->json(['success' => true, 'changed' => $contentChanged]);
     }
 
     public function updateDates(Request $request, $id)
@@ -624,6 +629,15 @@ class DocumentController extends Controller
         }
 
         return response()->json(['success' => false, 'message' => 'Gagal mengunggah file tanda tangan'], 400);
+    }
+
+    public function destroy($id)
+    {
+        $document = Document::findOrFail($id);
+        
+        $document->delete();
+
+        return response()->json(['success' => true, 'message' => 'Dokumen berhasil dihapus.']);
     }
 
     public function search(Request $request)
