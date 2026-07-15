@@ -142,27 +142,27 @@
 </div>
 
 <!-- Export Buttons -->
-<div class="flex gap-3 mb-6" x-data>
-    <a href="{{ route('reports.export-pdf', request()->all()) }}" target="_blank" class="bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
+<div class="flex flex-col sm:flex-row gap-3 mb-6" x-data>
+    <a href="{{ route('reports.export-pdf', request()->all()) }}" target="_blank" class="w-full sm:w-auto justify-center bg-red-600 hover:bg-red-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
         <i class="fa-solid fa-file-pdf mr-2"></i> Ekspor PDF
     </a>
-    <a href="{{ route('reports.export-excel', request()->all()) }}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
+    <a href="{{ route('reports.export-excel', request()->all()) }}" target="_blank" class="w-full sm:w-auto justify-center bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
         <i class="fa-solid fa-file-excel mr-2"></i> Ekspor Excel
     </a>
-    <button @click="window.print()" class="bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition">
+    <button @click="window.print()" class="w-full sm:w-auto justify-center bg-slate-600 hover:bg-slate-700 text-white px-5 py-2.5 rounded-lg text-sm font-medium shadow-sm transition inline-flex items-center">
         <i class="fa-solid fa-print mr-2"></i> Cetak
     </button>
 </div>
 
 <!-- Preview Table -->
 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
-    <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+    <div class="p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <h3 class="font-bold text-slate-800">Pratinjau Laporan</h3>
-        <span class="text-xs text-slate-500">Menampilkan {{ $recentDocs->count() }} data terbaru sesuai filter</span>
+        <span class="text-xs text-slate-500">Menampilkan {{ $recentDocs->firstItem() ?? 0 }} - {{ $recentDocs->lastItem() ?? 0 }} dari {{ $recentDocs->total() }} data</span>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-left text-sm text-slate-600">
-            <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500">
+            <thead class="bg-slate-50 text-xs uppercase font-semibold text-slate-500 whitespace-nowrap">
                 <tr>
                     <th class="px-6 py-3">No</th>
                     <th class="px-6 py-3">Judul Kerjasama</th>
@@ -174,9 +174,9 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                @foreach($recentDocs as $idx => $doc)
+                @forelse($recentDocs as $idx => $doc)
                 <tr class="hover:bg-slate-50 transition">
-                    <td class="px-6 py-3">{{ $idx + 1 }}</td>
+                    <td class="px-6 py-3 whitespace-nowrap">{{ $recentDocs->firstItem() + $idx }}</td>
                     <td class="px-6 py-3 font-medium text-slate-900">{{ $doc->title }}</td>
                     <td class="px-6 py-3">
                         @php
@@ -193,16 +193,36 @@
                     <td class="px-6 py-3">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-3">
                         @php
-                            $sc = match($doc->status) { 'signed' => 'bg-green-100 text-green-700', 'draft' => 'bg-slate-100 text-slate-600', default => 'bg-yellow-100 text-yellow-700' };
-                            $sl = match($doc->status) { 'signed' => 'Aktif', 'draft' => 'DRAFT', 'review_client' => 'REVIEW MITRA', 'review_unit' => 'REVIEW UNIT', default => strtoupper(str_replace('_', ' ', $doc->status)) };
+                            $isExpired = $doc->status == 'expired' || ($doc->end_date && \Carbon\Carbon::parse($doc->end_date)->isPast() && $doc->status == 'signed');
+                            if ($isExpired) {
+                                $sc = 'bg-red-100 text-red-700';
+                                $sl = 'KADALUARSA';
+                            } else {
+                                $sc = match($doc->status) { 'signed' => 'bg-green-100 text-green-700', 'draft' => 'bg-slate-100 text-slate-600', default => 'bg-yellow-100 text-yellow-700' };
+                                $sl = match($doc->status) { 'signed' => 'Aktif', 'draft' => 'DRAFT', 'review_client' => 'REVIEW MITRA', 'review_unit' => 'REVIEW UNIT', default => strtoupper(str_replace('_', ' ', $doc->status)) };
+                            }
                         @endphp
                         <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $sc }}">{{ $sl }}</span>
                     </td>
                 </tr>
-                @endforeach
+                @empty
+                <tr>
+                    <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                        <div class="flex flex-col items-center justify-center">
+                            <i class="fa-solid fa-folder-open text-4xl mb-3 text-slate-300"></i>
+                            <p>Belum ada data laporan kerjasama</p>
+                        </div>
+                    </td>
+                </tr>
+                @endforelse
             </tbody>
         </table>
     </div>
+    @if($recentDocs->hasPages())
+    <div class="p-4 border-t border-slate-100">
+        {{ $recentDocs->links() }}
+    </div>
+    @endif
 </div>
 @endsection
 

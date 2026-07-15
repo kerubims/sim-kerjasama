@@ -53,7 +53,7 @@ class ReportController extends Controller
 
         $query = (clone $baseQuery)->with('parties.user');
         
-        $recentDocs = $query->orderBy('created_at', 'desc')->take(20)->get();
+        $recentDocs = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
         
         $allDocs = $query->orderBy('created_at', 'desc')->get();
         

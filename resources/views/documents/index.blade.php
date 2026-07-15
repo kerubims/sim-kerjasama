@@ -28,7 +28,13 @@
     </button>
 
     {{-- Active Filter Chips --}}
-    <div class="flex items-center gap-2 flex-wrap">
+    <div class="flex items-center gap-2 flex-wrap w-full md:w-auto">
+        {{-- Total Documents Badge --}}
+        <div class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-white text-xs font-medium rounded-full shadow-sm">
+            <i class="fa-solid fa-file-lines text-[10px]"></i>
+            Total: {{ $documents->total() }} Dokumen
+        </div>
+
         @if(request('q'))
             <a href="{{ request()->fullUrlWithQuery(['q' => null, 'page' => null]) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-medium rounded-full hover:bg-blue-100 transition">
                 <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
