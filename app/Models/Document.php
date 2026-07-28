@@ -12,6 +12,8 @@ class Document extends Model
     protected $fillable = [
         'parent_id',
         'type',
+        'cooperation_scope',
+        'documentation_link',
         'document_number',
         'title',
         'content',

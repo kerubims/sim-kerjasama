@@ -48,15 +48,55 @@ class DashboardController extends Controller
             $selectedYear = $request->input('year', date('Y'));
             $mouData = array_fill(0, 12, 0);
             $moaData = array_fill(0, 12, 0);
-            $docsThisYear = Document::whereYear('created_at', $selectedYear)->get();
+            $docsThisYear = Document::whereYear('created_at', $selectedYear)
+                ->whereIn('status', ['signed', 'expired'])
+                ->get();
             foreach ($docsThisYear as $doc) {
                 $month = (int)$doc->created_at->format('n') - 1;
                 if (strtolower($doc->type) === 'mou') $mouData[$month]++;
                 if (strtolower($doc->type) === 'moa') $moaData[$month]++;
             }
             
-            // Donut Chart: Komposisi Jenis Dokumen
-            $typeStats = Document::selectRaw('type, count(*) as count')->groupBy('type')->get()->pluck('count', 'type');
+            // Donut Chart: Hierarki Dokumen (Funnel / Progression)
+            $mouCount = Document::where('type', 'MoU')
+                ->whereIn('status', ['signed', 'expired'])
+                ->count();
+                
+            $mouWithMoa = Document::where('type', 'MoU')
+                ->whereIn('status', ['signed', 'expired'])
+                ->whereHas('children', function($q) {
+                    $q->where('type', 'MoA')->whereIn('status', ['signed', 'expired']);
+                })->count();
+                
+            $mouWithIa = Document::where('type', 'MoU')
+                ->whereIn('status', ['signed', 'expired'])
+                ->whereHas('children', function($q) {
+                    $q->where('type', 'MoA')->whereIn('status', ['signed', 'expired'])
+                      ->whereHas('children', function($q2) {
+                          $q2->where('type', 'IA')->whereIn('status', ['signed', 'expired']);
+                      });
+                })->count();
+
+            // Donut Chart: Kategori Kerjasama (Scope)
+            $scopeStats = Document::selectRaw('cooperation_scope, count(*) as count')
+                ->whereNotNull('cooperation_scope')
+                ->whereIn('status', ['signed', 'expired'])
+                ->groupBy('cooperation_scope')
+                ->get()->pluck('count', 'cooperation_scope');
+
+            // Top Mitra
+            $topMitra = \App\Models\DocumentParty::where('role_type', 'client')
+                ->whereHas('document', function($q) {
+                    $q->whereIn('status', ['signed', 'expired']);
+                })
+                ->with(['user.partner'])
+                ->get()
+                ->groupBy(function($party) {
+                    return $party->user->nama_mitra ?? $party->user->partner->name ?? $party->user->name ?? 'Unknown';
+                })
+                ->map->count()
+                ->sortByDesc(fn($count) => $count)
+                ->take(5);
 
             $chartData = [
                 'bar' => [
@@ -64,12 +104,25 @@ class DashboardController extends Controller
                     'moa' => $moaData
                 ],
                 'donut' => [
-                    'labels' => ['MoU', 'MoA', 'IA'],
+                    'labels' => ['Total MoU', 'MoU dengan MoA', 'MoU dengan IA'],
                     'data' => [
-                        $typeStats['mou'] ?? 0,
-                        $typeStats['moa'] ?? 0,
-                        $typeStats['ia'] ?? 0
+                        $mouCount,
+                        $mouWithMoa,
+                        $mouWithIa
                     ]
+                ],
+                'scope' => [
+                    'labels' => ['Lokal', 'Dalam Negeri', 'Nasional', 'Luar Negeri'],
+                    'data' => [
+                        $scopeStats['lokal'] ?? 0,
+                        $scopeStats['dalam_negeri'] ?? 0,
+                        $scopeStats['nasional'] ?? 0,
+                        $scopeStats['luar_negeri'] ?? 0,
+                    ]
+                ],
+                'top_mitra' => [
+                    'labels' => $topMitra->keys()->toArray(),
+                    'data' => $topMitra->values()->toArray(),
                 ]
             ];
         }
@@ -83,10 +136,40 @@ class DashboardController extends Controller
             return response()->json(['error' => 'Unauthorized'], 403);
         }
 
+        $type = $request->input('type', 'bar'); // default bar for backward compatibility
+        
+        if ($type === 'unit') {
+            $filter = $request->input('filter', 'all'); // 'all', 'this_year', 'last_year'
+            
+            $query = \App\Models\DocumentParty::where('role_type', 'unit_pengusul')
+                ->join('users', 'document_parties.user_id', '=', 'users.id')
+                ->join('proposer_units', 'users.proposer_unit_id', '=', 'proposer_units.id')
+                ->join('documents', 'document_parties.document_id', '=', 'documents.id')
+                ->whereIn('documents.status', ['signed', 'expired'])
+                ->selectRaw('proposer_units.name, count(document_parties.id) as count')
+                ->groupBy('proposer_units.name');
+
+            if ($filter === 'this_year') {
+                $query->whereYear('document_parties.created_at', date('Y'));
+            } elseif ($filter === 'last_year') {
+                $query->whereYear('document_parties.created_at', date('Y') - 1);
+            }
+
+            $data = $query->get()->pluck('count', 'name');
+            
+            return response()->json([
+                'labels' => $data->keys(),
+                'data' => $data->values()
+            ]);
+        }
+        
+        // Fallback for bar chart
         $selectedYear = $request->input('year', date('Y'));
         $mouData = array_fill(0, 12, 0);
         $moaData = array_fill(0, 12, 0);
-        $docsThisYear = Document::whereYear('created_at', $selectedYear)->get();
+        $docsThisYear = Document::whereYear('created_at', $selectedYear)
+            ->whereIn('status', ['signed', 'expired'])
+            ->get();
         
         foreach ($docsThisYear as $doc) {
             $month = (int)$doc->created_at->format('n') - 1;

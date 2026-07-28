@@ -43,9 +43,9 @@
                 </td>
                 <td class="text-center">{{ strtoupper($doc->type) }}</td>
                 <td>{{ $doc->document_number ?? '-' }}</td>
-                <td>{{ $doc->parties->where('role_type', 'client')->first()?->user->nama_mitra ?? '-' }}</td>
-                <td>{{ $doc->parties->where('role_type', 'client')->first()?->user->name ?? '-' }}</td>
-                <td>{{ $doc->parties->where('role_type', 'unit_pengusul')->first()?->user->jabatan ?? '-' }}</td>
+                <td>{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? $p->user->partner->name ?? $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                <td>{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                <td>{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->proposerUnit->name ?? $p->user->jabatan ?? $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
                 <td class="text-center">{{ strtoupper(str_replace('_', ' ', $doc->status)) }}</td>
                 <td>{{ $doc->start_date ? $doc->start_date->format('d M Y') : '-' }}</td>
                 <td>{{ $doc->end_date ? $doc->end_date->format('d M Y') : '-' }}</td>

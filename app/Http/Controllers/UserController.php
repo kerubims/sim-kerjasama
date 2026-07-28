@@ -12,7 +12,7 @@ class UserController extends Controller
 {
     public function index(Request $request)
     {
-        $query = User::with('roles');
+        $query = User::with(['roles', 'partner', 'proposerUnit']);
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -22,10 +22,12 @@ class UserController extends Controller
             });
         }
 
-        $users = $query->orderBy('name')->paginate(15)->appends($request->query());
+        $users = $query->orderBy('created_at', 'desc')->paginate(15)->appends($request->query());
         $roles = Role::orderBy('name')->get();
+        $partners = \App\Models\Partner::orderBy('name')->get();
+        $units = \App\Models\ProposerUnit::orderBy('name')->get();
 
-        return view('users.index', compact('users', 'roles'));
+        return view('users.index', compact('users', 'roles', 'partners', 'units'));
     }
 
     public function store(Request $request)
@@ -35,16 +37,16 @@ class UserController extends Controller
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|string|min:6',
             'role'     => 'required|exists:roles,name',
-            'jabatan'  => 'nullable|string|max:255',
-            'nama_mitra' => 'nullable|string|max:255',
+            'proposer_unit_id' => 'nullable|exists:proposer_units,id',
+            'partner_id' => 'nullable|exists:partners,id',
         ]);
 
         $user = User::create([
             'name'     => $request->name,
             'email'    => $request->email,
             'password' => Hash::make($request->password),
-            'jabatan'  => $request->jabatan,
-            'nama_mitra' => $request->nama_mitra,
+            'proposer_unit_id' => $request->role === 'unit_pengusul' ? $request->proposer_unit_id : null,
+            'partner_id' => $request->role === 'client' ? $request->partner_id : null,
         ]);
 
         $user->assignRole($request->role);
@@ -60,15 +62,15 @@ class UserController extends Controller
             'name'  => 'required|string|max:255',
             'email' => ['required', 'email', Rule::unique('users')->ignore($user->id)],
             'role'  => 'required|exists:roles,name',
-            'jabatan'  => 'nullable|string|max:255',
-            'nama_mitra' => 'nullable|string|max:255',
+            'proposer_unit_id' => 'nullable|exists:proposer_units,id',
+            'partner_id' => 'nullable|exists:partners,id',
         ]);
 
         $user->update([
             'name'  => $request->name,
             'email' => $request->email,
-            'jabatan'  => $request->jabatan,
-            'nama_mitra' => $request->nama_mitra,
+            'proposer_unit_id' => $request->role === 'unit_pengusul' ? $request->proposer_unit_id : null,
+            'partner_id' => $request->role === 'client' ? $request->partner_id : null,
         ]);
 
         if ($request->filled('password')) {

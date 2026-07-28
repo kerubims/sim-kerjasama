@@ -7,6 +7,8 @@ use App\Models\DocumentHistory;
 use App\Models\DocumentParty;
 use App\Models\DocumentComment;
 use App\Models\User;
+use App\Models\Partner;
+use App\Models\ProposerUnit;
 use App\Notifications\DocumentNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -30,6 +32,10 @@ class DocumentController extends Controller
 
         if ($request->filled('type')) {
             $query->where('type', $request->type);
+        }
+
+        if ($request->filled('cooperation_scope')) {
+            $query->where('cooperation_scope', $request->cooperation_scope);
         }
 
         if ($request->filled('status')) {
@@ -84,8 +90,10 @@ class DocumentController extends Controller
         $documents = $query->paginate(10);
         $allDocs = Document::all(); // for parent selection
 
-        $clients = User::role('client')->get();
-        $units = User::role('unit_pengusul')->get();
+        $clients = User::role('client')->with('partner')->get();
+        $units = User::role('unit_pengusul')->with('proposerUnit')->get();
+        $partners = Partner::orderBy('name')->get();
+        $proposerUnits = ProposerUnit::orderBy('name')->get();
 
         // Nomor dokumen terakhir per jenis
         $lastDocNumbers = [
@@ -94,7 +102,7 @@ class DocumentController extends Controller
             'ia'  => Document::where('type', 'ia')->whereNotNull('document_number')->latest()->first()?->document_number,
         ];
         
-        return view('documents.index', compact('documents', 'clients', 'units', 'allDocs', 'lastDocNumbers'));
+        return view('documents.index', compact('documents', 'clients', 'units', 'allDocs', 'lastDocNumbers', 'partners', 'proposerUnits'));
     }
 
     public function store(Request $request)
@@ -126,6 +134,7 @@ class DocumentController extends Controller
             'title' => 'required|string|max:255',
             'document_number' => 'nullable|string|max:255|unique:documents,document_number',
             'type' => 'required|in:mou,moa,ia',
+            'cooperation_scope' => 'nullable|in:lokal,dalam_negeri,nasional,luar_negeri',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after:start_date',
             'parties' => 'required|array|min:2',
@@ -148,6 +157,7 @@ class DocumentController extends Controller
         $document = Document::create([
             'title' => $request->title,
             'type' => $request->type,
+            'cooperation_scope' => $request->cooperation_scope,
             'start_date' => $request->start_date,
             'end_date' => $request->end_date,
             'parent_id' => $request->parent_id,
@@ -317,24 +327,36 @@ class DocumentController extends Controller
 
     public function updateDates(Request $request, $id)
     {
-        $request->validate([
-            'start_date'      => 'required|date',
-            'end_date'        => 'required|date|after:start_date',
-            'document_number' => 'nullable|string|max:255',
-        ], [
-            'start_date.required' => 'Tanggal mulai wajib diisi.',
+        $document = Document::findOrFail($id);
+
+        $rules = [
+            'document_number'    => 'nullable|string|max:255',
+            'cooperation_scope'  => 'nullable|string|in:lokal,dalam_negeri,nasional,luar_negeri',
+            'documentation_link' => 'nullable|url|max:1000',
+        ];
+
+        if ($document->status === 'signed') {
+            $rules['start_date'] = 'required|date';
+            $rules['end_date']   = 'required|date|after:start_date';
+        } else {
+            $rules['start_date'] = 'nullable|date';
+            $rules['end_date']   = 'nullable|date|after_or_equal:start_date';
+        }
+
+        $request->validate($rules, [
+            'start_date.required' => 'Tanggal mulai wajib diisi karena dokumen sudah aktif.',
             'start_date.date'     => 'Format tanggal mulai tidak valid.',
-            'end_date.required'   => 'Tanggal selesai wajib diisi.',
+            'end_date.required'   => 'Tanggal selesai wajib diisi karena dokumen sudah aktif.',
             'end_date.date'       => 'Format tanggal selesai tidak valid.',
             'end_date.after'      => 'Tanggal selesai harus setelah tanggal mulai.',
+            'end_date.after_or_equal' => 'Tanggal selesai tidak boleh sebelum tanggal mulai.',
+            'documentation_link.url' => 'Format link dokumentasi tidak valid.',
         ]);
-
-        $document = Document::findOrFail($id);
 
         $oldStart = $document->start_date ? \Carbon\Carbon::parse($document->start_date)->format('d M Y') : '-';
         $oldEnd   = $document->end_date ? \Carbon\Carbon::parse($document->end_date)->format('d M Y') : '-';
-        $newStart = \Carbon\Carbon::parse($request->start_date)->format('d M Y');
-        $newEnd   = \Carbon\Carbon::parse($request->end_date)->format('d M Y');
+        $newStart = $request->start_date ? \Carbon\Carbon::parse($request->start_date)->format('d M Y') : '-';
+        $newEnd   = $request->end_date ? \Carbon\Carbon::parse($request->end_date)->format('d M Y') : '-';
 
         $updateData = [
             'start_date' => $request->start_date,
@@ -342,7 +364,9 @@ class DocumentController extends Controller
         ];
 
         $messages = [];
-        $messages[] = "Tanggal diperbarui: {$oldStart}–{$oldEnd} → {$newStart}–{$newEnd}";
+        if ($oldStart !== $newStart || $oldEnd !== $newEnd) {
+            $messages[] = "Tanggal diperbarui: {$oldStart}–{$oldEnd} → {$newStart}–{$newEnd}";
+        }
 
         if ($request->filled('document_number') && $request->document_number !== $document->document_number) {
             $existing = Document::where('document_number', $request->document_number)->where('id', '!=', $document->id)->exists();
@@ -354,6 +378,17 @@ class DocumentController extends Controller
             $messages[] = "Nomor dokumen diperbarui: {$oldNum} → {$request->document_number}";
         }
 
+        if ($request->has('cooperation_scope') && $request->cooperation_scope !== $document->cooperation_scope) {
+            $oldScope = $document->cooperation_scope ?? '-';
+            $updateData['cooperation_scope'] = $request->cooperation_scope;
+            $messages[] = "Kategori kerja sama diperbarui: {$oldScope} → {$request->cooperation_scope}";
+        }
+
+        if ($request->has('documentation_link') && $request->documentation_link !== $document->documentation_link) {
+            $updateData['documentation_link'] = $request->documentation_link;
+            $messages[] = "Link dokumentasi diperbarui";
+        }
+
         $document->update($updateData);
 
         DocumentHistory::create([
@@ -363,21 +398,23 @@ class DocumentController extends Controller
             'message'     => implode('. ', $messages),
         ]);
 
-        // Cek Peringatan Kedaluwarsa H-30
-        $endDateCarbon = \Carbon\Carbon::parse($request->end_date)->startOfDay();
-        $today = now()->startOfDay();
-        $daysUntilExpiration = $today->diffInDays($endDateCarbon, false);
+        // Cek Peringatan Kedaluwarsa H-30 hanya jika end_date ada
+        if ($request->end_date) {
+            $endDateCarbon = \Carbon\Carbon::parse($request->end_date)->startOfDay();
+            $today = now()->startOfDay();
+            $daysUntilExpiration = $today->diffInDays($endDateCarbon, false);
 
-        if ($daysUntilExpiration >= 0 && $daysUntilExpiration <= 30) {
-            $admins = \App\Models\User::role('super_admin')->get();
-            $alertTitle = $daysUntilExpiration === 30 ? 'Peringatan Kedaluwarsa H-30' : 'Peringatan Kedaluwarsa Kritis';
-            
-            Notification::send($admins, new DocumentNotification(
-                $alertTitle,
-                'Dokumen "' . Str::limit($document->title, 40) . '" akan kedaluwarsa dalam ' . $daysUntilExpiration . ' hari (' . $newEnd . ').',
-                'fa-triangle-exclamation text-yellow-500',
-                route('documents.editor', $document->id)
-            ));
+            if ($daysUntilExpiration >= 0 && $daysUntilExpiration <= 30) {
+                $admins = \App\Models\User::role('super_admin')->get();
+                $alertTitle = $daysUntilExpiration === 30 ? 'Peringatan Kedaluwarsa H-30' : 'Peringatan Kedaluwarsa Kritis';
+                
+                Notification::send($admins, new DocumentNotification(
+                    $alertTitle,
+                    'Dokumen "' . Str::limit($document->title, 40) . '" akan kedaluwarsa dalam ' . $daysUntilExpiration . ' hari (' . $newEnd . ').',
+                    'fa-triangle-exclamation text-yellow-500',
+                    route('documents.editor', $document->id)
+                ));
+            }
         }
 
         return response()->json(['success' => true, 'message' => 'Data dokumen berhasil diperbarui.']);

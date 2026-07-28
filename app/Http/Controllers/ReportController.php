@@ -23,6 +23,9 @@ class ReportController extends Controller
         if ($request->filled('type')) {
             $baseQuery->where('type', strtolower($request->type));
         }
+        if ($request->filled('cooperation_scope')) {
+            $baseQuery->where('cooperation_scope', strtolower($request->cooperation_scope));
+        }
         if ($request->filled('status')) {
             $baseQuery->where('status', strtolower($request->status));
         }

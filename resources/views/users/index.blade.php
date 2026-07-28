@@ -43,8 +43,8 @@
                 <tr>
                     <th class="px-6 py-4">Pengguna</th>
                     <th class="px-6 py-4">Email</th>
-                    <th class="px-6 py-4">Jabatan</th>
-                    <th class="px-6 py-4">Nama Mitra</th>
+                    <th class="px-6 py-4">Unit Pengusul</th>
+                    <th class="px-6 py-4">Mitra</th>
                     <th class="px-6 py-4">Role</th>
                     <th class="px-6 py-4">Terdaftar</th>
                     <th class="px-6 py-4 text-right">Aksi</th>
@@ -68,8 +68,8 @@
                         </div>
                     </td>
                     <td class="px-6 py-4 font-mono text-xs">{{ $u->email }}</td>
-                    <td class="px-6 py-4 text-xs">{{ $u->jabatan ?: '-' }}</td>
-                    <td class="px-6 py-4 text-xs">{{ $u->nama_mitra ?: '-' }}</td>
+                    <td class="px-6 py-4 text-xs">{{ $u->proposerUnit->name ?? '-' }}</td>
+                    <td class="px-6 py-4 text-xs">{{ $u->partner->name ?? '-' }}</td>
                     <td class="px-6 py-4">
                         @php
                             $roleName = $u->roles->first()?->name ?? 'none';
@@ -86,7 +86,7 @@
                     </td>
                     <td class="px-6 py-4 text-xs text-slate-500">{{ $u->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-4 text-right">
-                        <button @click="editUser({{ $u->id }}, '{{ addslashes($u->name) }}', '{{ $u->email }}', '{{ addslashes($u->jabatan) }}', '{{ addslashes($u->nama_mitra) }}', '{{ $roleName }}')" class="text-slate-400 hover:text-blue-600 transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
+                        <button @click="editUser({{ $u->id }}, '{{ addslashes($u->name) }}', '{{ $u->email }}', '{{ $u->proposer_unit_id ?? '' }}', '{{ $u->partner_id ?? '' }}', '{{ $roleName }}')" class="text-slate-400 hover:text-blue-600 transition" title="Edit"><i class="fa-solid fa-pen-to-square"></i></button>
                         @if($u->id !== auth()->id())
                         <form method="POST" action="{{ route('users.destroy', $u->id) }}" class="inline" onsubmit="return confirm('Yakin ingin menghapus pengguna ini?')">
                             @csrf @method('DELETE')
@@ -132,19 +132,30 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                        <select name="role" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select name="role" required onchange="toggleRoleFields(this.value, 'create')" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Pilih Role --</option>
                             @foreach($roles as $role)
                             <option value="{{ $role->name }}">{{ strtoupper(str_replace('client', 'mitra', str_replace('_', ' ', $role->name))) }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan <span class="text-xs text-slate-400 font-normal">(opsional)</span></label>
-                        <input type="text" name="jabatan" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Misal: Direktur">
+                    <div id="create-unit-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Unit Pengusul <span class="text-xs text-slate-400 font-normal">(wajib untuk unit)</span></label>
+                        <select name="proposer_unit_id" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Pilih Unit --</option>
+                            @foreach($units as $unit)
+                            <option value="{{ $unit->id }}">{{ $unit->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Nama Mitra / Instansi <span class="text-xs text-slate-400 font-normal">(khusus mitra)</span></label>
-                        <input type="text" name="nama_mitra" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nama organisasi atau perusahaan">
+                    <div id="create-partner-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Mitra / Instansi <span class="text-xs text-slate-400 font-normal">(wajib untuk mitra)</span></label>
+                        <select name="partner_id" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Pilih Mitra --</option>
+                            @foreach($partners as $partner)
+                            <option value="{{ $partner->id }}">{{ $partner->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
             </div>
@@ -178,19 +189,29 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Role</label>
-                        <select name="role" id="edit-role" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <select name="role" id="edit-role" onchange="toggleRoleFields(this.value, 'edit')" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                             @foreach($roles as $role)
                             <option value="{{ $role->name }}">{{ strtoupper(str_replace('client', 'mitra', str_replace('_', ' ', $role->name))) }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan <span class="text-xs text-slate-400 font-normal">(opsional)</span></label>
-                        <input type="text" name="jabatan" id="edit-jabatan" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Misal: Direktur">
+                    <div id="edit-unit-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Unit Pengusul <span class="text-xs text-slate-400 font-normal">(wajib untuk unit)</span></label>
+                        <select name="proposer_unit_id" id="edit-unit" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Pilih Unit --</option>
+                            @foreach($units as $unit)
+                            <option value="{{ $unit->id }}">{{ $unit->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-700 mb-1">Nama Mitra / Instansi <span class="text-xs text-slate-400 font-normal">(khusus mitra)</span></label>
-                        <input type="text" name="nama_mitra" id="edit-nama-mitra" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nama organisasi atau perusahaan">
+                    <div id="edit-partner-field" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Mitra / Instansi <span class="text-xs text-slate-400 font-normal">(wajib untuk mitra)</span></label>
+                        <select name="partner_id" id="edit-partner" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">-- Pilih Mitra --</option>
+                            @foreach($partners as $partner)
+                            <option value="{{ $partner->id }}">{{ $partner->name }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
             </div>
@@ -205,15 +226,31 @@
 
 @push('scripts')
 <script>
+function toggleRoleFields(role, prefix) {
+    if (role === 'client') {
+        document.getElementById(prefix + '-partner-field').classList.remove('hidden');
+        document.getElementById(prefix + '-unit-field').classList.add('hidden');
+    } else if (role === 'unit_pengusul') {
+        document.getElementById(prefix + '-unit-field').classList.remove('hidden');
+        document.getElementById(prefix + '-partner-field').classList.add('hidden');
+    } else {
+        document.getElementById(prefix + '-unit-field').classList.add('hidden');
+        document.getElementById(prefix + '-partner-field').classList.add('hidden');
+    }
+}
+
 function userPage() {
     return {
-        editUser(id, name, email, jabatan, nama_mitra, role) {
+        editUser(id, name, email, unit_id, partner_id, role) {
             document.getElementById('form-edit-user').action = '/users/' + id;
             document.getElementById('edit-name').value = name;
             document.getElementById('edit-email').value = email;
-            document.getElementById('edit-jabatan').value = jabatan;
-            document.getElementById('edit-nama-mitra').value = nama_mitra;
+            document.getElementById('edit-unit').value = unit_id;
+            document.getElementById('edit-partner').value = partner_id;
             document.getElementById('edit-role').value = role;
+            
+            toggleRoleFields(role, 'edit');
+            
             document.getElementById('modal-edit-user').classList.remove('hidden');
         }
     }

@@ -40,6 +40,20 @@
                       {{ $currentRoute === 'reports.index' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
                 <i class="fa-solid fa-file-export w-5"></i> Ekspor Laporan
             </a>
+
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4 mb-2">Master Data</div>
+            <a href="{{ route('master.partners') }}"
+               class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
+                      {{ $currentRoute === 'master.partners' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
+                <i class="fa-solid fa-handshake w-5"></i> Master Mitra
+            </a>
+            <a href="{{ route('master.units') }}"
+               class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
+                      {{ $currentRoute === 'master.units' ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">
+                <i class="fa-solid fa-building-columns w-5"></i> Master Pengusul
+            </a>
+
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-4 mb-2">Pengguna</div>
             <a href="{{ route('users.index') }}"
                class="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition
                       {{ str_starts_with($currentRoute, 'users') ? 'bg-blue-50 text-blue-700' : 'text-slate-600 hover:bg-slate-50' }}">

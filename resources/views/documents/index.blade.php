@@ -21,7 +21,7 @@
         class="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-slate-300 text-slate-600 hover:border-blue-500 hover:text-blue-600 text-sm font-medium transition shrink-0">
         <i class="fa-solid fa-sliders"></i>
         <span>Filter</span>
-        @php $activeFilters = array_filter(request()->only(['q','type','status','unit','client','created_from','created_to'])); @endphp
+        @php $activeFilters = array_filter(request()->only(['q','type','status','unit','client','created_from','created_to','cooperation_scope'])); @endphp
         @if(count($activeFilters) > 0)
             <span class="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-600 text-white rounded-full text-[10px] flex items-center justify-center font-bold">{{ count($activeFilters) }}</span>
         @endif
@@ -68,7 +68,10 @@
             </a>
         @endif
         @if(request('unit'))
-            @php $unitLabel = $units->firstWhere('id', request('unit'))?->name ?? 'Unit'; @endphp
+            @php 
+                $u = $units->firstWhere('id', request('unit'));
+                $unitLabel = $u ? ($u->proposerUnit->name ?? $u->jabatan ?? $u->name) : 'Unit'; 
+            @endphp
             <a href="{{ request()->fullUrlWithQuery(['unit' => null, 'page' => null]) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-700 text-xs font-medium rounded-full hover:bg-orange-100 transition">
                 <i class="fa-solid fa-building text-[10px]"></i>
                 {{ Str::limit($unitLabel, 20) }}
@@ -76,7 +79,10 @@
             </a>
         @endif
         @if(request('client'))
-            @php $clientLabel = $clients->firstWhere('id', request('client'))?->name ?? 'Mitra'; @endphp
+            @php 
+                $c = $clients->firstWhere('id', request('client'));
+                $clientLabel = $c ? ($c->nama_mitra ?? $c->partner->name ?? $c->name) : 'Mitra'; 
+            @endphp
             <a href="{{ request()->fullUrlWithQuery(['client' => null, 'page' => null]) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-teal-50 border border-teal-200 text-teal-700 text-xs font-medium rounded-full hover:bg-teal-100 transition">
                 <i class="fa-solid fa-handshake text-[10px]"></i>
                 {{ Str::limit($clientLabel, 20) }}
@@ -131,7 +137,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <label class="block text-xs font-medium text-slate-500 mb-1.5">Jenis Dokumen</label>
-                        <select name="type" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <select name="type" class="w-full text-sm bg-white tom-select-filter">
                             <option value="">Semua Jenis</option>
                             <option value="mou" {{ request('type') == 'mou' ? 'selected' : '' }}>MoU</option>
                             <option value="moa" {{ request('type') == 'moa' ? 'selected' : '' }}>MoA</option>
@@ -140,7 +146,7 @@
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-500 mb-1.5">Status</label>
-                        <select name="status" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                        <select name="status" class="w-full text-sm bg-white tom-select-filter">
                             <option value="">Semua Status</option>
                             <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
                             <option value="review_client" {{ request('status') == 'review_client' ? 'selected' : '' }}>Review Mitra</option>
@@ -153,21 +159,32 @@
                 </div>
 
                 <div>
+                    <label class="block text-xs font-medium text-slate-500 mb-1.5">Kategori Kerja Sama</label>
+                    <select name="cooperation_scope" class="w-full text-sm bg-white tom-select-filter">
+                        <option value="">Semua Kategori</option>
+                        <option value="lokal" {{ request('cooperation_scope') == 'lokal' ? 'selected' : '' }}>Lokal</option>
+                        <option value="dalam_negeri" {{ request('cooperation_scope') == 'dalam_negeri' ? 'selected' : '' }}>Dalam Negeri</option>
+                        <option value="nasional" {{ request('cooperation_scope') == 'nasional' ? 'selected' : '' }}>Nasional</option>
+                        <option value="luar_negeri" {{ request('cooperation_scope') == 'luar_negeri' ? 'selected' : '' }}>Luar Negeri</option>
+                    </select>
+                </div>
+
+                <div>
                     <label class="block text-xs font-medium text-slate-500 mb-1.5">Unit Pengusul</label>
-                    <select name="unit" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                    <select name="unit" class="w-full text-sm bg-white tom-select-filter">
                         <option value="">Semua Unit</option>
                         @foreach($units as $u)
-                            <option value="{{ $u->id }}" {{ request('unit') == $u->id ? 'selected' : '' }}>{{ $u->name }}</option>
+                            <option value="{{ $u->id }}" {{ request('unit') == $u->id ? 'selected' : '' }}>{{ $u->proposerUnit->name ?? $u->jabatan ?? $u->name }}</option>
                         @endforeach
                     </select>
                 </div>
 
                 <div>
                     <label class="block text-xs font-medium text-slate-500 mb-1.5">Mitra</label>
-                    <select name="client" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                    <select name="client" class="w-full text-sm bg-white tom-select-filter">
                         <option value="">Semua Mitra</option>
                         @foreach($clients as $c)
-                            <option value="{{ $c->id }}" {{ request('client') == $c->id ? 'selected' : '' }}>{{ $c->name }}</option>
+                            <option value="{{ $c->id }}" {{ request('client') == $c->id ? 'selected' : '' }}>{{ $c->nama_mitra ?? $c->partner->name ?? $c->name }}</option>
                         @endforeach
                     </select>
                 </div>
@@ -204,10 +221,13 @@
                     <th class="px-6 py-4">No</th>
                     <th class="px-6 py-4">Judul</th>
                     <th class="px-6 py-4">Jenis</th>
+                    <th class="px-6 py-4">Kategori</th>
                     <th class="px-6 py-4">Mitra</th>
                     <th class="px-6 py-4">Nama PIC</th>                    
                     <th class="px-6 py-4">Unit</th>
+                    @if(auth()->user()->role === 'super_admin')
                     <th class="px-6 py-4">Tanggal Dibuat</th>
+                    @endif
                     <th class="px-6 py-4">Tanggal Mulai</th>
                     <th class="px-6 py-4">Tanggal Selesai</th>
                     <th class="px-6 py-4">Status</th>
@@ -237,10 +257,35 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">
+                        @php
+                            $scopeLabel = match($doc->cooperation_scope) {
+                                'lokal' => 'Lokal',
+                                'dalam_negeri' => 'DN',
+                                'nasional' => 'Nasional',
+                                'luar_negeri' => 'LN',
+                                default => '-',
+                            };
+                            $scopeClass = match($doc->cooperation_scope) {
+                                'lokal' => 'bg-slate-100 text-slate-600',
+                                'dalam_negeri' => 'bg-cyan-100 text-cyan-700',
+                                'nasional' => 'bg-amber-100 text-amber-700',
+                                'luar_negeri' => 'bg-indigo-100 text-indigo-700',
+                                default => '',
+                            };
+                        @endphp
+                        @if($doc->cooperation_scope)
+                            <span class="px-2 py-1 rounded text-xs font-medium {{ $scopeClass }}">{{ $scopeLabel }}</span>
+                        @else
+                            <span class="text-slate-400">-</span>
+                        @endif
+                    </td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->partner->name ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->jabatan ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->proposerUnit->name ?? '-')->join(', ') ?: '-' }}</td>
+                    @if(auth()->user()->role === 'super_admin')
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
+                    @endif
                     <td class="px-6 py-4">{{ $doc->start_date ? \Carbon\Carbon::parse($doc->start_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4 font-medium text-slate-600">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-4">
@@ -281,14 +326,19 @@
                             </a>
                         @endif
                         @role('super_admin')
+                        @if($doc->documentation_link)
+                        <a href="{{ $doc->documentation_link }}" target="_blank" class="text-emerald-600 hover:text-emerald-800 text-xs font-medium mr-3" title="Lihat Dokumentasi">
+                            <i class="fa-solid fa-folder-open mr-1"></i>
+                        </a>
+                        @endif
                         <button type="button"
-                            onclick="openEditDateModal({{ $doc->id }}, '{{ addslashes($doc->document_number) }}', '{{ $doc->start_date ? $doc->start_date->format('Y-m-d') : '' }}', '{{ $doc->end_date ? $doc->end_date->format('Y-m-d') : '' }}', '{{ addslashes($doc->title) }}')"
-                            class="text-slate-500 hover:text-slate-700 text-xs font-medium">
+                            onclick="openEditDateModal({{ $doc->id }}, '{{ addslashes($doc->document_number) }}', '{{ $doc->start_date ? $doc->start_date->format('Y-m-d') : '' }}', '{{ $doc->end_date ? $doc->end_date->format('Y-m-d') : '' }}', '{{ addslashes($doc->title) }}', '{{ $doc->cooperation_scope }}', '{{ addslashes($doc->documentation_link) }}')"
+                            class="text-slate-500 hover:text-slate-700 text-xs font-medium" title="Ubah Data Dokumen">
                             <i class="fa-solid fa-pen mr-1"></i> 
                         </button>
                         <button type="button"
                             onclick="openDeleteModal({{ $doc->id }}, '{{ addslashes($doc->title) }}')"
-                            class="text-red-500 hover:text-red-700 text-xs font-medium ml-3">
+                            class="text-red-500 hover:text-red-700 text-xs font-medium ml-3" title="Hapus Dokumen">
                             <i class="fa-solid fa-trash mr-1"></i> 
                         </button>
                         @endrole
@@ -296,7 +346,7 @@
                 </tr>
                 @empty
                 <tr>
-                    <td colspan="9" class="px-6 py-8 text-center text-slate-400">Belum ada dokumen</td>
+                    <td colspan="12" class="px-6 py-8 text-center text-slate-400">Belum ada dokumen</td>
                 </tr>
                 @endforelse
             </tbody>
@@ -350,6 +400,16 @@
                         </select>
                     </div>
                     <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Kategori Kerja Sama</label>
+                        <select name="cooperation_scope" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="" {{ old('cooperation_scope') == '' ? 'selected' : '' }}>-- Pilih Kategori --</option>
+                            <option value="lokal" {{ old('cooperation_scope') == 'lokal' ? 'selected' : '' }}>Lokal</option>
+                            <option value="dalam_negeri" {{ old('cooperation_scope') == 'dalam_negeri' ? 'selected' : '' }}>Dalam Negeri</option>
+                            <option value="nasional" {{ old('cooperation_scope') == 'nasional' ? 'selected' : '' }}>Nasional</option>
+                            <option value="luar_negeri" {{ old('cooperation_scope') == 'luar_negeri' ? 'selected' : '' }}>Luar Negeri</option>
+                        </select>
+                    </div>
+                    <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Nomor Dokumen <span class="text-slate-400 text-xs font-normal ml-1">(Opsional saat draft)</span></label>
                         <input type="text" name="document_number" value="{{ old('document_number') }}" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Masukkan nomor dokumen...">
                         <p id="last-doc-number-info" class="text-xs text-blue-600 mt-1 hidden"><i class="fa-solid fa-circle-info mr-1"></i> Nomor dokumen terakhir: <strong id="last-doc-number-text"></strong></p>
@@ -371,14 +431,16 @@
                                     <option value="">-- Pilih Pihak {{ $idx == 0 ? 'Pertama' : ($idx == 1 ? 'Kedua' : 'Tambahan') }} --</option>
                                     <optgroup label="Unit Pengusul (Internal)">
                                         @foreach($units as $unit)
-                                            <option value="{{ $unit->id }}" {{ $selectedParty == $unit->id ? 'selected' : '' }}>{{ $unit->jabatan ?: $unit->name }}</option>
+                                            <option value="{{ $unit->id }}" {{ $selectedParty == $unit->id ? 'selected' : '' }}>{{ $unit->proposerUnit->name ?? 'Tanpa Unit' }} - {{ $unit->name }}</option>
                                         @endforeach
                                     </optgroup>
+                                    @if($idx != 0)
                                     <optgroup label="Mitra (Eksternal)">
                                         @foreach($clients as $client)
-                                            <option value="{{ $client->id }}" {{ $selectedParty == $client->id ? 'selected' : '' }}>{{ $client->nama_mitra ?: $client->name }}</option>
+                                            <option value="{{ $client->id }}" {{ $selectedParty == $client->id ? 'selected' : '' }}>{{ $client->partner->name ?? 'Tanpa Mitra' }} - {{ $client->name }}</option>
                                         @endforeach
                                     </optgroup>
+                                    @endif
                                 </select>
                                 <button type="button" {!! $idx >= 2 ? 'onclick="removeParty(this)"' : 'disabled' !!} class="{{ $idx >= 2 ? 'text-red-500 hover:text-red-700' : 'text-slate-300 cursor-not-allowed' }} px-2 py-2"><i class="fa-solid fa-trash"></i></button>
                             </div>
@@ -451,6 +513,22 @@
                     <input type="text" id="edit-date-doc-number" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
                 </div>
 
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Kategori Kerja Sama</label>
+                    <select id="edit-date-scope" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm">
+                        <option value="">-- Pilih Kategori --</option>
+                        <option value="lokal">Lokal</option>
+                        <option value="dalam_negeri">Dalam Negeri</option>
+                        <option value="nasional">Nasional</option>
+                        <option value="luar_negeri">Luar Negeri</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Link Dokumentasi (Google Drive, dll)</label>
+                    <input type="url" id="edit-date-doc-link" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="https://drive.google.com/...">
+                </div>
+
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Tanggal Mulai</label>
@@ -509,6 +587,17 @@
     let parentSelectTs;
 
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize TomSelect for filter selects
+        document.querySelectorAll('.tom-select-filter').forEach(el => {
+            new TomSelect(el, {
+                create: false,
+                sortField: {
+                    field: "text",
+                    direction: "asc"
+                }
+            });
+        });
+
         // Initialize TomSelect for existing party selects
         document.querySelectorAll('select[name="parties[]"]').forEach(el => {
             initPartySelect(el);
@@ -580,12 +669,12 @@
             <option value="">-- Pilih Pihak Tambahan --</option>
             <optgroup label="Unit Pengusul (Internal)">
                 @foreach($units as $unit)
-                    <option value="{{ $unit->id }}">{{ $unit->jabatan ?: $unit->name }}</option>
+                    <option value="{{ $unit->id }}">{{ $unit->proposerUnit->name ?? 'Tanpa Unit' }} - {{ $unit->name }}</option>
                 @endforeach
             </optgroup>
             <optgroup label="Mitra (Eksternal)">
                 @foreach($clients as $client)
-                    <option value="{{ $client->id }}">{{ $client->nama_mitra ?: $client->name }}</option>
+                    <option value="{{ $client->id }}">{{ $client->partner->name ?? 'Tanpa Mitra' }} - {{ $client->name }}</option>
                 @endforeach
             </optgroup>
         </select>
@@ -682,11 +771,13 @@
 
 <script>
 // Edit Date Modal
-function openEditDateModal(docId, docNumber, startDate, endDate, title) {
+function openEditDateModal(docId, docNumber, startDate, endDate, title, scope, docLink) {
     document.getElementById('edit-date-doc-id').value = docId;
     document.getElementById('edit-date-doc-number').value = docNumber;
     document.getElementById('edit-date-start').value = startDate;
     document.getElementById('edit-date-end').value = endDate;
+    document.getElementById('edit-date-scope').value = scope || '';
+    document.getElementById('edit-date-doc-link').value = docLink || '';
     document.getElementById('edit-date-title').textContent = title;
     document.getElementById('edit-date-error').classList.add('hidden');
     document.getElementById('edit-date-error').textContent = '';
@@ -699,6 +790,8 @@ document.getElementById('form-edit-date').addEventListener('submit', async funct
     const docNumber = document.getElementById('edit-date-doc-number').value;
     const startDate = document.getElementById('edit-date-start').value;
     const endDate = document.getElementById('edit-date-end').value;
+    const scope = document.getElementById('edit-date-scope').value;
+    const docLink = document.getElementById('edit-date-doc-link').value;
     const errEl = document.getElementById('edit-date-error');
     const btn = document.getElementById('btn-save-dates');
 
@@ -714,7 +807,7 @@ document.getElementById('form-edit-date').addEventListener('submit', async funct
                 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
                 'Accept': 'application/json',
             },
-            body: JSON.stringify({ document_number: docNumber, start_date: startDate, end_date: endDate }),
+            body: JSON.stringify({ document_number: docNumber, start_date: startDate, end_date: endDate, cooperation_scope: scope, documentation_link: docLink }),
         });
 
         const data = await res.json();

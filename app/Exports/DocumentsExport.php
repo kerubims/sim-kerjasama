@@ -55,8 +55,6 @@ class DocumentsExport implements FromCollection, WithHeadings, WithMapping
 
     public function map($doc): array
     {
-        $client = $doc->parties->where('role_type', 'client')->first();
-        $unit = $doc->parties->where('role_type', 'unit_pengusul')->first();
 
         return [
             $doc->id,
@@ -64,9 +62,9 @@ class DocumentsExport implements FromCollection, WithHeadings, WithMapping
             strtoupper($doc->type),
             $doc->document_number ?? '-',
             $doc->parent ? $doc->parent->title : '-',
-            $client ? $client->user->nama_mitra : '-',
-            $client ? $client->user->name : '-',
-            $unit ? $unit->user->jabatan : '-',
+            $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? $p->user->partner->name ?? $p->user->name ?? '-')->join(', ') ?: '-',
+            $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-',
+            $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->proposerUnit->name ?? $p->user->jabatan ?? $p->user->name ?? '-')->join(', ') ?: '-',
             $doc->created_at->format('d M Y'),
             $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-',
             strtoupper(str_replace('_', ' ', $doc->status)),

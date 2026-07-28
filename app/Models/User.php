@@ -12,7 +12,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Spatie\Permission\Traits\HasRoles;
 
-#[Fillable(['name', 'email', 'password', 'jabatan', 'nama_mitra'])]
+#[Fillable(['name', 'email', 'password', 'jabatan', 'nama_mitra', 'partner_id', 'proposer_unit_id'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -30,5 +30,21 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Get the partner (master mitra) this user belongs to.
+     */
+    public function partner()
+    {
+        return $this->belongsTo(Partner::class);
+    }
+
+    /**
+     * Get the proposer unit (master pengusul) this user belongs to.
+     */
+    public function proposerUnit()
+    {
+        return $this->belongsTo(ProposerUnit::class);
     }
 }

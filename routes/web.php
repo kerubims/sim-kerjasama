@@ -7,6 +7,7 @@ use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\MasterDataController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Gotenberg\Gotenberg;
@@ -28,6 +29,7 @@ Route::middleware(['auth'])->group(function () {
     // Documents (Super Admin only)
     Route::middleware(['role:super_admin'])->group(function () {
         Route::get('/dashboard/chart-data', [DashboardController::class, 'getChartData'])->name('dashboard.chart-data');
+        Route::get('/dashboard/unit-chart-data', [DashboardController::class, 'getUnitChartData'])->name('dashboard.unit-chart-data');
         Route::post('/documents', [DocumentController::class, 'store'])->name('documents.store');
         Route::put('/documents/{id}/dates', [DocumentController::class, 'updateDates'])->name('documents.updateDates');
         Route::delete('/documents/{id}', [DocumentController::class, 'destroy'])->name('documents.destroy');
@@ -35,6 +37,17 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/tracking', [TrackingController::class, 'index'])->name('tracking.index');
 
         Route::get('/reports', [ReportController::class, 'index'])->name('reports.index');
+
+        // Master Data
+        Route::get('/master/partners', [MasterDataController::class, 'partnersIndex'])->name('master.partners');
+        Route::post('/master/partners', [MasterDataController::class, 'partnerStore'])->name('master.partners.store');
+        Route::put('/master/partners/{id}', [MasterDataController::class, 'partnerUpdate'])->name('master.partners.update');
+        Route::delete('/master/partners/{id}', [MasterDataController::class, 'partnerDestroy'])->name('master.partners.destroy');
+
+        Route::get('/master/units', [MasterDataController::class, 'unitsIndex'])->name('master.units');
+        Route::post('/master/units', [MasterDataController::class, 'unitStore'])->name('master.units.store');
+        Route::put('/master/units/{id}', [MasterDataController::class, 'unitUpdate'])->name('master.units.update');
+        Route::delete('/master/units/{id}', [MasterDataController::class, 'unitDestroy'])->name('master.units.destroy');
     });
 
     Route::get('/reports/export-pdf', [App\Http\Controllers\ReportController::class, 'exportPdf'])->name('reports.export-pdf');

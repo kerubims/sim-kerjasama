@@ -4,6 +4,29 @@
 @section('page-title', 'Ekspor Laporan Kerjasama')
 
 @section('content')
+@push('styles')
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<style>
+.ts-control {
+    border-color: #cbd5e1 !important;
+    border-radius: 0.5rem !important;
+    padding: 0.5rem 0.75rem !important;
+    font-size: 0.875rem !important;
+    min-height: 38px !important;
+}
+.ts-control.focus {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5) !important;
+}
+.ts-dropdown {
+    font-size: 0.875rem !important;
+    border-radius: 0.375rem !important;
+    border-color: #cbd5e1 !important;
+    z-index: 100 !important;
+}
+</style>
+@endpush
+
 <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
     <div class="bg-gradient-to-br from-slate-800 to-slate-900 p-5 rounded-xl shadow-lg text-white">
         <div class="flex items-center justify-between">
@@ -87,7 +110,7 @@
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Jenis Dokumen</label>
-            <select name="type" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select name="type" class="w-full text-sm tom-select-filter">
                 <option value="">Semua Jenis</option>
                 <option value="mou" {{ request('type') == 'mou' ? 'selected' : '' }}>MoU</option>
                 <option value="moa" {{ request('type') == 'moa' ? 'selected' : '' }}>MoA</option>
@@ -96,7 +119,7 @@
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Status</label>
-            <select name="status" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select name="status" class="w-full text-sm tom-select-filter">
                 <option value="">Semua Status</option>
                 <option value="signed" {{ request('status') == 'signed' ? 'selected' : '' }}>Aktif</option>
                 <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
@@ -107,7 +130,7 @@
         </div>
         <div>
             <label class="block text-sm font-medium text-slate-700 mb-1">Unit</label>
-            <select name="unit" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+            <select name="unit" class="w-full text-sm tom-select-filter">
                 <option value="">Semua Unit</option>
                 @foreach($units as $unitValue => $unitLabel)
                     <option value="{{ $unitValue }}" {{ request('unit') == $unitValue ? 'selected' : '' }}>{{ $unitLabel }}</option>
@@ -188,7 +211,7 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-3">{{ $doc->parties->where('role_type', 'client')->first()?->user->nama_mitra ?? '-' }}</td>
+                    <td class="px-6 py-3">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? $p->user->partner->name ?? $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-3">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-3">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-3">
@@ -228,8 +251,20 @@
 
 @push('scripts')
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialize TomSelect for filter selects
+    document.querySelectorAll('.tom-select-filter').forEach(el => {
+        new TomSelect(el, {
+            create: false,
+            sortField: {
+                field: "text",
+                direction: "asc"
+            }
+        });
+    });
+
     new Chart(document.getElementById('reportBarChart'), {
         type: 'bar',
         data: {
