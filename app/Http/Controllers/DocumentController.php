@@ -200,6 +200,24 @@ class DocumentController extends Controller
         ));
 
         $successMsg = $request->submission_type === 'upload' ? 'Dokumen final berhasil diunggah dan status menjadi aktif' : 'Dokumen berhasil dibuat';
+
+        if ($request->end_date) {
+            $endDateCarbon = \Carbon\Carbon::parse($request->end_date)->startOfDay();
+            $today = now()->startOfDay();
+            $daysUntilExpiration = $today->diffInDays($endDateCarbon, false);
+            
+            if ($daysUntilExpiration >= 0 && $daysUntilExpiration <= 30) {
+                $admins = User::role('super_admin')->get();
+                $alertTitle = $daysUntilExpiration === 30 ? 'Peringatan Kedaluwarsa H-30' : 'Peringatan Kedaluwarsa Kritis';
+                Notification::send($admins, new DocumentNotification(
+                    $alertTitle,
+                    'Dokumen baru "' . Str::limit($document->title, 40) . '" akan kedaluwarsa dalam ' . $daysUntilExpiration . ' hari.',
+                    'fa-triangle-exclamation text-yellow-500',
+                    route('documents.editor', $document->id)
+                ));
+            }
+        }
+
         return redirect()->route('documents.editor', $document->id)->with('success', $successMsg);
     }
 
@@ -344,6 +362,23 @@ class DocumentController extends Controller
             'action'      => 'Date Update',
             'message'     => implode('. ', $messages),
         ]);
+
+        // Cek Peringatan Kedaluwarsa H-30
+        $endDateCarbon = \Carbon\Carbon::parse($request->end_date)->startOfDay();
+        $today = now()->startOfDay();
+        $daysUntilExpiration = $today->diffInDays($endDateCarbon, false);
+
+        if ($daysUntilExpiration >= 0 && $daysUntilExpiration <= 30) {
+            $admins = \App\Models\User::role('super_admin')->get();
+            $alertTitle = $daysUntilExpiration === 30 ? 'Peringatan Kedaluwarsa H-30' : 'Peringatan Kedaluwarsa Kritis';
+            
+            Notification::send($admins, new DocumentNotification(
+                $alertTitle,
+                'Dokumen "' . Str::limit($document->title, 40) . '" akan kedaluwarsa dalam ' . $daysUntilExpiration . ' hari (' . $newEnd . ').',
+                'fa-triangle-exclamation text-yellow-500',
+                route('documents.editor', $document->id)
+            ));
+        }
 
         return response()->json(['success' => true, 'message' => 'Data dokumen berhasil diperbarui.']);
     }

@@ -76,8 +76,8 @@
                                     <i class="fa-solid text-xs" :class="n.icon"></i>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="text-sm font-medium text-slate-800 truncate" x-text="n.title"></div>
-                                    <div class="text-xs text-slate-500 mt-0.5 line-clamp-2" x-text="n.message"></div>
+                                    <div class="text-sm font-medium text-slate-800 break-words" x-text="n.title"></div>
+                                    <div class="text-xs text-slate-500 mt-0.5 break-words" x-text="n.message"></div>
                                     <div class="text-xs text-slate-400 mt-1" x-text="n.created_at"></div>
                                 </div>
                                 <div x-show="!n.read" class="w-2 h-2 bg-blue-500 rounded-full mt-2 shrink-0"></div>
