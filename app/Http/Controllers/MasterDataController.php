@@ -31,9 +31,15 @@ class MasterDataController extends Controller
 
     public function partnerStore(Request $request)
     {
+        $category = $request->category;
+        if ($category === 'lainnya' && $request->filled('custom_category')) {
+            $category = $request->custom_category;
+            $request->merge(['category' => $category]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255|unique:partners,name',
-            'category' => 'required|in:pemerintah,swasta,pendidikan,lainnya',
+            'category' => 'required|string|max:255',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
@@ -42,8 +48,7 @@ class MasterDataController extends Controller
         ], [
             'name.required' => 'Nama mitra wajib diisi.',
             'name.unique' => 'Nama mitra sudah terdaftar.',
-            'category.required' => 'Kategori mitra wajib dipilih.',
-            'category.in' => 'Kategori mitra tidak valid.',
+            'category.required' => 'Kategori mitra wajib diisi.',
         ]);
 
         Partner::create($request->only(['name', 'category', 'address', 'phone', 'email', 'website', 'description']));
@@ -55,9 +60,15 @@ class MasterDataController extends Controller
     {
         $partner = Partner::findOrFail($id);
 
+        $category = $request->category;
+        if ($category === 'lainnya' && $request->filled('custom_category')) {
+            $category = $request->custom_category;
+            $request->merge(['category' => $category]);
+        }
+
         $request->validate([
             'name' => 'required|string|max:255|unique:partners,name,' . $partner->id,
-            'category' => 'required|in:pemerintah,swasta,pendidikan,lainnya',
+            'category' => 'required|string|max:255',
             'address' => 'nullable|string',
             'phone' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',

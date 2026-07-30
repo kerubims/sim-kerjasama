@@ -499,10 +499,10 @@
 
 <!-- Modal Edit Tanggal -->
 <div id="modal-edit-date" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
-        <form id="form-edit-date">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden transform transition-all">
+        <form id="form-edit-date" class="flex flex-col min-h-0">
             <input type="hidden" id="edit-date-doc-id">
-            <div class="bg-white px-6 pt-6 pb-4">
+            <div class="bg-white px-6 pt-6 pb-4 overflow-y-auto flex-1">
                 <h3 class="text-base font-semibold text-slate-900 mb-1">Ubah Data Dokumen</h3>
                 <p id="edit-date-title" class="text-sm text-slate-500 mb-4 truncate"></p>
 

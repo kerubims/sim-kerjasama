@@ -112,10 +112,10 @@
 
 {{-- Modal Add User --}}
 <div id="modal-add-user" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <form action="{{ route('users.store') }}" method="POST">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <form action="{{ route('users.store') }}" method="POST" class="flex flex-col min-h-0">
             @csrf
-            <div class="px-6 py-5">
+            <div class="px-6 py-5 overflow-y-auto flex-1">
                 <h3 class="text-lg font-semibold text-slate-900 mb-4"><i class="fa-solid fa-user-plus mr-2 text-blue-600"></i>Tambah Pengguna Baru</h3>
                 <div class="space-y-4">
                     <div>
@@ -169,10 +169,10 @@
 
 {{-- Modal Edit User --}}
 <div id="modal-edit-user" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <form id="form-edit-user" method="POST">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <form id="form-edit-user" method="POST" class="flex flex-col min-h-0">
             @csrf @method('PUT')
-            <div class="px-6 py-5">
+            <div class="px-6 py-5 overflow-y-auto flex-1">
                 <h3 class="text-lg font-semibold text-slate-900 mb-4"><i class="fa-solid fa-user-pen mr-2 text-blue-600"></i>Edit Pengguna</h3>
                 <div class="space-y-4">
                     <div>

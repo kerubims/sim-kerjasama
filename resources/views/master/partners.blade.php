@@ -20,8 +20,8 @@
         <select name="category" class="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
             <option value="">Semua Kategori</option>
             <option value="pemerintah" {{ request('category') == 'pemerintah' ? 'selected' : '' }}>Pemerintah</option>
-            <option value="swasta" {{ request('category') == 'swasta' ? 'selected' : '' }}>Swasta</option>
-            <option value="pendidikan" {{ request('category') == 'pendidikan' ? 'selected' : '' }}>Pendidikan</option>
+            <option value="perusahaan" {{ request('category') == 'perusahaan' ? 'selected' : '' }}>Perusahaan</option>
+            <option value="perguruan_tinggi" {{ request('category') == 'perguruan_tinggi' ? 'selected' : '' }}>Perguruan Tinggi</option>
             <option value="lainnya" {{ request('category') == 'lainnya' ? 'selected' : '' }}>Lainnya</option>
         </select>
         <button type="submit" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition">
@@ -64,12 +64,17 @@
                         @php
                             $catClass = match($partner->category) {
                                 'pemerintah' => 'bg-blue-100 text-blue-700',
-                                'swasta' => 'bg-green-100 text-green-700',
-                                'pendidikan' => 'bg-purple-100 text-purple-700',
+                                'perusahaan', 'swasta' => 'bg-green-100 text-green-700',
+                                'perguruan_tinggi', 'pendidikan' => 'bg-purple-100 text-purple-700',
                                 default => 'bg-slate-100 text-slate-600',
                             };
+                            $catDisplay = match($partner->category) {
+                                'perusahaan', 'swasta' => 'Perusahaan',
+                                'perguruan_tinggi', 'pendidikan' => 'Perguruan Tinggi',
+                                default => ucfirst($partner->category),
+                            };
                         @endphp
-                        <span class="px-2 py-1 rounded text-xs font-medium {{ $catClass }}">{{ ucfirst($partner->category) }}</span>
+                        <span class="px-2 py-1 rounded text-xs font-medium {{ $catClass }}">{{ $catDisplay }}</span>
                     </td>
                     <td class="px-6 py-4">{{ $partner->email ?: '-' }}</td>
                     <td class="px-6 py-4">{{ $partner->phone ?: '-' }}</td>
@@ -103,10 +108,10 @@
 
 {{-- Modal Create Partner --}}
 <div id="modal-create-partner" class="fixed inset-0 bg-slate-900/50 {{ $errors->any() ? '' : 'hidden' }} items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <form action="{{ route('master.partners.store') }}" method="POST">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <form action="{{ route('master.partners.store') }}" method="POST" class="flex flex-col min-h-0">
             @csrf
-            <div class="px-6 pt-6 pb-4">
+            <div class="px-6 pt-6 pb-4 overflow-y-auto flex-1">
                 <h3 class="text-base font-semibold text-slate-900 mb-4">
                     <i class="fa-solid fa-building text-blue-500 mr-2"></i> Tambah Mitra Baru
                 </h3>
@@ -128,12 +133,16 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Kategori <span class="text-red-500">*</span></label>
-                        <select name="category" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                        <select name="category" required onchange="toggleCustomCategory(this, 'create-custom-category')" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
                             <option value="pemerintah" {{ old('category') == 'pemerintah' ? 'selected' : '' }}>Pemerintah</option>
-                            <option value="swasta" {{ old('category', 'swasta') == 'swasta' ? 'selected' : '' }}>Swasta</option>
-                            <option value="pendidikan" {{ old('category') == 'pendidikan' ? 'selected' : '' }}>Pendidikan</option>
+                            <option value="perusahaan" {{ old('category', 'perusahaan') == 'perusahaan' ? 'selected' : '' }}>Perusahaan</option>
+                            <option value="perguruan_tinggi" {{ old('category') == 'perguruan_tinggi' ? 'selected' : '' }}>Perguruan Tinggi</option>
                             <option value="lainnya" {{ old('category') == 'lainnya' ? 'selected' : '' }}>Lainnya</option>
                         </select>
+                    </div>
+                    <div id="create-custom-category" class="{{ old('category') == 'lainnya' ? '' : 'hidden' }}">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Kategori Lainnya <span class="text-red-500">*</span></label>
+                        <input type="text" name="custom_category" value="{{ old('custom_category') }}" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Masukkan kategori...">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -169,11 +178,11 @@
 
 {{-- Modal Edit Partner --}}
 <div id="modal-edit-partner" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden">
-        <form id="form-edit-partner" method="POST">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden">
+        <form id="form-edit-partner" method="POST" class="flex flex-col min-h-0">
             @csrf
             @method('PUT')
-            <div class="px-6 pt-6 pb-4">
+            <div class="px-6 pt-6 pb-4 overflow-y-auto flex-1">
                 <h3 class="text-base font-semibold text-slate-900 mb-4">
                     <i class="fa-solid fa-pen text-blue-500 mr-2"></i> Edit Data Mitra
                 </h3>
@@ -184,12 +193,16 @@
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-slate-700 mb-1">Kategori <span class="text-red-500">*</span></label>
-                        <select name="category" id="edit-partner-category" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
+                        <select name="category" id="edit-partner-category" required onchange="toggleCustomCategory(this, 'edit-custom-category-container')" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm bg-white">
                             <option value="pemerintah">Pemerintah</option>
-                            <option value="swasta">Swasta</option>
-                            <option value="pendidikan">Pendidikan</option>
+                            <option value="perusahaan">Perusahaan</option>
+                            <option value="perguruan_tinggi">Perguruan Tinggi</option>
                             <option value="lainnya">Lainnya</option>
                         </select>
+                    </div>
+                    <div id="edit-custom-category-container" class="hidden">
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Kategori Lainnya <span class="text-red-500">*</span></label>
+                        <input type="text" name="custom_category" id="edit-partner-custom-category" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" placeholder="Masukkan kategori...">
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <div>
@@ -227,10 +240,43 @@
 
 @push('scripts')
 <script>
+function toggleCustomCategory(selectEl, targetId) {
+    const target = document.getElementById(targetId);
+    if (selectEl.value === 'lainnya') {
+        target.classList.remove('hidden');
+        target.querySelector('input').required = true;
+    } else {
+        target.classList.add('hidden');
+        target.querySelector('input').required = false;
+    }
+}
+
 function openEditPartnerModal(partner) {
     document.getElementById('form-edit-partner').action = '/master/partners/' + partner.id;
     document.getElementById('edit-partner-name').value = partner.name;
-    document.getElementById('edit-partner-category').value = partner.category;
+    
+    // Normalize old values for edit form display
+    let catValue = partner.category;
+    if (catValue === 'swasta') catValue = 'perusahaan';
+    if (catValue === 'pendidikan') catValue = 'perguruan_tinggi';
+
+    const standardCategories = ['pemerintah', 'perusahaan', 'perguruan_tinggi'];
+    const selectCat = document.getElementById('edit-partner-category');
+    const customContainer = document.getElementById('edit-custom-category-container');
+    const customInput = document.getElementById('edit-partner-custom-category');
+    
+    if (standardCategories.includes(catValue)) {
+        selectCat.value = catValue;
+        customContainer.classList.add('hidden');
+        customInput.required = false;
+        customInput.value = '';
+    } else {
+        selectCat.value = 'lainnya';
+        customContainer.classList.remove('hidden');
+        customInput.required = true;
+        customInput.value = partner.category;
+    }
+    
     document.getElementById('edit-partner-email').value = partner.email || '';
     document.getElementById('edit-partner-phone').value = partner.phone || '';
     document.getElementById('edit-partner-website').value = partner.website || '';

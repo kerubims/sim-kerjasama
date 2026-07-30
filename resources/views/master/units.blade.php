@@ -85,10 +85,10 @@
 
 {{-- Modal Create Unit --}}
 <div id="modal-create-unit" class="fixed inset-0 bg-slate-900/50 {{ $errors->any() ? '' : 'hidden' }} items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <form action="{{ route('master.units.store') }}" method="POST">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        <form action="{{ route('master.units.store') }}" method="POST" class="flex flex-col min-h-0">
             @csrf
-            <div class="px-6 pt-6 pb-4">
+            <div class="px-6 pt-6 pb-4 overflow-y-auto flex-1">
                 <h3 class="text-base font-semibold text-slate-900 mb-4">
                     <i class="fa-solid fa-building text-blue-500 mr-2"></i> Tambah Unit Pengusul
                 </h3>
@@ -128,11 +128,11 @@
 
 {{-- Modal Edit Unit --}}
 <div id="modal-edit-unit" class="fixed inset-0 bg-slate-900/50 hidden items-center justify-center z-50 backdrop-blur-sm flex">
-    <div class="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-        <form id="form-edit-unit" method="POST">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+        <form id="form-edit-unit" method="POST" class="flex flex-col min-h-0">
             @csrf
             @method('PUT')
-            <div class="px-6 pt-6 pb-4">
+            <div class="px-6 pt-6 pb-4 overflow-y-auto flex-1">
                 <h3 class="text-base font-semibold text-slate-900 mb-4">
                     <i class="fa-solid fa-pen text-blue-500 mr-2"></i> Edit Unit Pengusul
                 </h3>
