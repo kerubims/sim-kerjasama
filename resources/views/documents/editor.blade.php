@@ -334,9 +334,17 @@ function editorPage() {
                         text: 'Import DOCX',
                         icon: 'upload',
                         onAction: () => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = '.docx, .doc, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword';
+                            let input = document.getElementById('hidden-docx-file-input');
+                            if (!input) {
+                                input = document.createElement('input');
+                                input.id = 'hidden-docx-file-input';
+                                input.type = 'file';
+                                input.style.display = 'none';
+                                document.body.appendChild(input);
+                            }
+                            input.accept = '.docx,.doc';
+                            input.value = '';
+
                             input.onchange = (e) => {
                                 const file = e.target.files[0];
                                 if (file) {
@@ -363,9 +371,9 @@ function editorPage() {
                                             xhr.open('POST', '/documents/import-docx', true);
                                             xhr.setRequestHeader('X-CSRF-TOKEN', this.csrfToken);
 
-                                            xhr.upload.onprogress = (e) => {
-                                                if (e.lengthComputable) {
-                                                    const percent = Math.round((e.loaded / e.total) * 100);
+                                            xhr.upload.onprogress = (event) => {
+                                                if (event.lengthComputable) {
+                                                    const percent = Math.round((event.loaded / event.total) * 100);
                                                     const bar = document.getElementById('import-progress-bar');
                                                     const text = document.getElementById('import-progress-text');
                                                     const title = document.getElementById('import-status-title');
@@ -374,7 +382,7 @@ function editorPage() {
                                                     if (text) text.textContent = percent + '% selesai';
                                                     if (title) {
                                                         title.textContent = percent < 100 
-                                                            ? `Mengunggah berkas (${(e.loaded / (1024*1024)).toFixed(2)} MB)...` 
+                                                            ? `Mengunggah berkas (${(event.loaded / (1024*1024)).toFixed(2)} MB)...` 
                                                             : 'Mengonversi struktur Word 1:1...';
                                                     }
                                                 }
