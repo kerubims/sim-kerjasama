@@ -19,6 +19,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        if (app()->runningInConsole() && !app()->runningUnitTests()) {
+            return;
+        }
+
         // Jalankan pengecekan dokumen kedaluwarsa maksimal 1 kali setiap hari
         // Menggunakan cache agar query ini tidak berjalan pada setiap request HTTP
         if (!\Illuminate\Support\Facades\Cache::has('daily_expired_document_check')) {
