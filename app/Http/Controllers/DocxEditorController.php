@@ -93,9 +93,12 @@ class DocxEditorController extends Controller
         file_put_contents($tempHtml, $html);
 
         $pythonBin = '/home/ubs/.hermes/hermes-agent/venv/bin/python3';
-        $scriptPath = base_path('app/Services/DocxExporter.py');
+        $scriptPath = base_path('app/Services/DocxPatcher.py');
 
-        $command = escapeshellcmd("$pythonBin $scriptPath " . escapeshellarg($tempHtml) . ' ' . escapeshellarg($docxPath));
+        // Use current docx as baseline or fallback template
+        $origDocx = file_exists($docxPath) ? $docxPath : storage_path('app/template_default.docx');
+
+        $command = escapeshellcmd("$pythonBin $scriptPath " . escapeshellarg($origDocx) . ' ' . escapeshellarg($tempHtml) . ' ' . escapeshellarg($docxPath));
         shell_exec($command);
 
         if (file_exists($tempHtml)) {
