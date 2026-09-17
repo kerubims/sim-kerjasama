@@ -10,6 +10,7 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "google/apiclient": "^2.19",
         "gotenberg/gotenberg-php": "^2.21",
+        "inertiajs/inertia-laravel": "^3.3",
         "intervention/image": "^4.0",
         "laravel/framework": "^13.0",
         "laravel/tinker": "^3.0",

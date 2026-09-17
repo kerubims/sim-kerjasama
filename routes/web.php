@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\DocxEditorController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\NotificationController;
@@ -64,6 +65,11 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/documents/search', [DocumentController::class, 'search'])->name('documents.search');
 
     Route::get('/documents/{id}/editor', [DocumentController::class, 'editor'])->name('documents.editor');
+    Route::get('/documents/{id}/docx-editor', [DocxEditorController::class, 'editor'])->name('documents.docx-editor');
+    Route::post('/documents/{id}/ast', [DocxEditorController::class, 'saveAst'])->name('documents.save-ast');
+    Route::post('/documents/{id}/upload-docx', [DocxEditorController::class, 'uploadDocx'])->name('documents.upload-docx');
+    Route::get('/documents/{id}/download-docx', [DocxEditorController::class, 'downloadDocx'])->name('documents.download-docx');
+    Route::get('/documents/{id}/download-pdf', [DocxEditorController::class, 'downloadPdf'])->name('documents.download-pdf');
     Route::get('/documents/{id}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::get('/documents/{id}/export-pdf', [DocumentController::class, 'exportPdf'])->name('documents.export-pdf');
     Route::get('/documents/{id}/export-docx', [DocumentController::class, 'exportDocx'])->name('documents.export-docx');
