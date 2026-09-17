@@ -58,20 +58,6 @@ def set_cell_margins(cell, top=100, bottom=100, left=150, right=150):
         tcMar.append(node)
     tcPr.append(tcMar)
 
-def set_cell_borders(cell, top=None, bottom=None, left=None, right=None, color="94A3B8", sz="4", val="single"):
-    tcPr = cell._tc.get_or_add_tcPr()
-    tcBorders = OxmlElement('w:tcBorders')
-    borders = {'top': top, 'left': left, 'bottom': bottom, 'right': right}
-    for border_name, border_style in borders.items():
-        if border_style is not None:
-            b_el = OxmlElement(f'w:{border_name}')
-            b_el.set(qn('w:val'), val)
-            b_el.set(qn('w:sz'), sz)
-            b_el.set(qn('w:space'), '0')
-            b_el.set(qn('w:color'), color)
-            tcBorders.append(b_el)
-    tcPr.append(tcBorders)
-
 def html_to_docx(html_content, output_path):
     doc = Document()
     
@@ -85,94 +71,18 @@ def html_to_docx(html_content, output_path):
         section.right_margin = Cm(2.0)
 
     soup = BeautifulSoup(html_content, 'html.parser')
-    
-    # Process elements
-    container = soup.find('div', class_='docx-document-canvas') or soup
 
     def process_node(node, parent_p=None, current_styles=None):
         if current_styles is None:
             current_styles = {}
 
-        if node.name in ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
-            p = doc.add_paragraph()
-            p_style = parse_css_style(node.get('style', ''))
-            
-            # Alignment
-            align = p_style.get('text-align', '').lower()
-            if align == 'center':
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            elif align == 'right':
-                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            elif align == 'justify':
-                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            else:
-                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
-
-            # Process children
-            for child in node.children:
-                process_node(child, p, p_style.copy())
-
-        elif node.name == 'table':
-            table_style = parse_css_style(node.get('style', ''))
-            rows = node.find_all('tr', recursive=False)
-            if not rows:
-                return
-            
-            num_rows = len(rows)
-            max_cols = max([len(r.find_all(['td', 'th'], recursive=False)) for r in rows]) if rows else 0
-            
-            table = doc.add_table(rows=num_rows, cols=max_cols)
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
-            table.autofit = False
-
-            for r_idx, tr in enumerate(rows):
-                cells = tr.find_all(['td', 'th'], recursive=False)
-                for c_idx, td in enumerate(cells):
-                    if c_idx >= max_cols:
-                        break
-                    cell = table.cell(r_idx, c_idx)
-                    cell_style = parse_css_style(td.get('style', ''))
-                    
-                    # Background
-                    bg_color = cell_style.get('background-color') or cell_style.get('background')
-                    if bg_color:
-                        set_cell_background(cell, bg_color)
-                    
-                    # Cell border & padding
-                    set_cell_borders(cell, top=True, bottom=True, left=True, right=True)
-                    set_cell_margins(cell, top=120, bottom=120, left=180, right=180)
-
-                    # Cell content
-                    p = cell.paragraphs[0]
-                    p.paragraph_format.space_before = Pt(2)
-                    p.paragraph_format.space_after = Pt(2)
-                    
-                    for child in td.children:
-                        process_node(child, p, cell_style.copy())
-
-        elif node.name in ['span', 'strong', 'b', 'em', 'i', 'u']:
-            merged_styles = current_styles.copy()
-            merged_styles.update(parse_css_style(node.get('style', '')))
-            
-            if node.name in ['strong', 'b']:
-                merged_styles['font-weight'] = 'bold'
-            if node.name in ['em', 'i']:
-                merged_styles['font-style'] = 'italic'
-            if node.name == 'u':
-                merged_styles['text-decoration'] = 'underline'
-
-            for child in node.children:
-                process_node(child, parent_p, merged_styles)
-
-        elif node.name is None:  # Text node
-            text_val = str(node)
+        if node.name is None:  # Text node
+            text_val = str(node).strip()
             if text_val:
                 if parent_p is None:
                     parent_p = doc.add_paragraph()
+                run = parent_p.add_run(str(node))
                 
-                run = parent_p.add_run(text_val)
-                
-                # Apply styling to run
                 font_family = current_styles.get('font-family')
                 if font_family:
                     clean_font = font_family.split(',')[0].strip(' "\'')
@@ -200,7 +110,78 @@ def html_to_docx(html_content, output_path):
                 if current_styles.get('text-decoration') == 'underline':
                     run.underline = True
 
-    for child in container.children:
+        elif node.name in ['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']:
+            p = doc.add_paragraph()
+            p_style = parse_css_style(node.get('style', ''))
+            
+            align = p_style.get('text-align', '').lower()
+            if align == 'center':
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif align == 'right':
+                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            elif align == 'justify':
+                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            else:
+                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
+            for child in node.children:
+                process_node(child, p, p_style.copy())
+
+        elif node.name == 'table':
+            table_style = parse_css_style(node.get('style', ''))
+            rows = node.find_all('tr', recursive=True)
+            if not rows:
+                return
+            
+            num_rows = len(rows)
+            max_cols = max([len(r.find_all(['td', 'th'], recursive=True)) for r in rows]) if rows else 0
+            if num_cols := max_cols:
+                table = doc.add_table(rows=num_rows, cols=num_cols)
+                table.alignment = WD_TABLE_ALIGNMENT.CENTER
+                table.autofit = False
+
+                for r_idx, tr in enumerate(rows):
+                    cells = tr.find_all(['td', 'th'], recursive=False)
+                    for c_idx, td in enumerate(cells):
+                        if c_idx >= num_cols:
+                            break
+                        cell = table.cell(r_idx, c_idx)
+                        cell_style = parse_css_style(td.get('style', ''))
+                        
+                        bg_color = cell_style.get('background-color') or cell_style.get('background')
+                        if bg_color:
+                            set_cell_background(cell, bg_color)
+                        
+                        set_cell_margins(cell, top=100, bottom=100, left=150, right=150)
+
+                        cell_p = cell.paragraphs[0]
+                        for child in td.children:
+                            process_node(child, cell_p, cell_style.copy())
+
+        elif node.name in ['span', 'strong', 'b', 'em', 'i', 'u', 'font', 'a']:
+            merged_styles = current_styles.copy()
+            merged_styles.update(parse_css_style(node.get('style', '')))
+            
+            if node.name in ['strong', 'b']:
+                merged_styles['font-weight'] = 'bold'
+            if node.name in ['em', 'i']:
+                merged_styles['font-style'] = 'italic'
+            if node.name == 'u':
+                merged_styles['text-decoration'] = 'underline'
+
+            for child in node.children:
+                process_node(child, parent_p, merged_styles)
+
+        else:
+            # Container tags like div, section, article, main, header, etc.
+            container_styles = current_styles.copy()
+            if hasattr(node, 'get'):
+                container_styles.update(parse_css_style(node.get('style', '')))
+
+            for child in getattr(node, 'children', []):
+                process_node(child, parent_p, container_styles)
+
+    for child in soup.children:
         process_node(child)
 
     doc.save(output_path)

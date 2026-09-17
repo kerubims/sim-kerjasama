@@ -312,17 +312,12 @@
                         <span class="px-2.5 py-1 rounded-full text-xs font-medium {{ $statusClass }}">{{ $statusLabel }}</span>
                     </td>
                     <td class="px-6 py-4 text-right whitespace-nowrap">
+                        <a href="{{ route('documents.docx-editor', ['id' => $doc->id]) }}" class="inline-flex items-center px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded shadow-xs mr-2 transition">
+                            <i class="fa-solid fa-pen-to-square mr-1"></i> Edit 1:1
+                        </a>
                         @if($doc->file_path)
-                            <a href="{{ route('documents.preview', ['id' => $doc->id]) }}" target="_blank" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">
-                                <i class="fa-solid fa-eye mr-1"></i>
-                            </a>
-                        @else
-                            <a href="{{ route('documents.editor', ['id' => $doc->id]) }}" class="text-blue-600 hover:text-blue-800 text-xs font-medium mr-3">
-                                @if($doc->status == 'signed' || $isExpired)
-                                    <i class="fa-solid fa-eye mr-1"></i> 
-                                @else
-                                    <i class="fa-solid fa-pen-to-square mr-1"></i> 
-                                @endif
+                            <a href="{{ route('documents.preview', ['id' => $doc->id]) }}" target="_blank" class="text-slate-600 hover:text-slate-800 text-xs font-medium mr-2">
+                                <i class="fa-solid fa-eye mr-1"></i> Preview
                             </a>
                         @endif
                         @role('super_admin')

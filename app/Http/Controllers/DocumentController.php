@@ -233,45 +233,7 @@ class DocumentController extends Controller
 
     public function editor($id)
     {
-        $user = Auth::user();
-        $document = Document::with([
-            'histories.user', 
-            'comments.user', 
-            'parties.user'
-        ])->findOrFail($id);
-
-        // Access control
-        if (!$user->hasRole('super_admin')) {
-            // Check if user is a party to the document
-            $isParty = $document->parties()->where('user_id', $user->id)->exists();
-            if (!$isParty) {
-                abort(403, 'Anda bukan pihak yang terlibat dalam dokumen ini.');
-            }
-
-            if ($user->hasRole('client')) {
-                if ($document->status === 'draft') {
-                    abort(403, 'Anda belum memiliki akses ke dokumen ini.');
-                }
-            }
-            // unit_pengusul can see all statuses as long as they are a party
-        }
-
-        $party = DocumentParty::where('document_id', $id)
-                              ->where('user_id', $user->id)
-                              ->first();
-        $userHasSigned = $party && $party->signature_path;
-
-        $canEdit = !$userHasSigned && (
-            ($user->hasRole('super_admin') && $document->status !== 'signed') ||
-            ($user->hasRole('client') && $document->status === 'review_client') ||
-            ($user->hasRole('unit_pengusul') && $document->status === 'review_unit')
-        );
-
-        return view('documents.editor', [
-            'doc' => $document,
-            'canEdit' => $canEdit,
-            'canImportDocx' => $canEdit,
-        ]);
+        return redirect()->route('documents.docx-editor', ['id' => $id]);
     }
 
     public function preview($id)
