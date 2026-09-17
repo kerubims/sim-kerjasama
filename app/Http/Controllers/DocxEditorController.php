@@ -22,6 +22,14 @@ class DocxEditorController extends Controller
         $astData = $this->getOrGenerateAst($document);
 
         return Inertia::render('DocxEditor', [
+            'doc' => [
+                'id' => $document->id,
+                'title' => $document->title,
+                'status' => $document->status,
+                'doc_number' => $document->doc_number,
+                'type' => $document->type,
+                'file_path' => $document->file_path,
+            ],
             'document' => [
                 'id' => $document->id,
                 'title' => $document->title,
