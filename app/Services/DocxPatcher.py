@@ -3,19 +3,25 @@ import sys
 import os
 import zipfile
 import re
-from bs4 import BeautifulSoup
+import warnings
+from difflib import SequenceMatcher
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
 from xml.etree import ElementTree as ET
+
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 NS = {
     'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
-    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'
+    'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
+    'xml': 'http://www.w3.org/XML/1998/namespace'
 }
-ET.register_namespace('w', 'http://schemas.openxmlformats.org/wordprocessingml/2006/main')
-ET.register_namespace('r', 'http://schemas.openxmlformats.org/officeDocument/2006/relationships')
+ET.register_namespace('w', NS['w'])
+ET.register_namespace('r', NS['r'])
 
 def patch_docx(original_docx_path, html_content, output_docx_path):
     soup = BeautifulSoup(html_content, 'html.parser')
     
+    # Extract HTML paragraphs
     html_paragraphs = []
     for elem in soup.find_all(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'td', 'th']):
         txt = elem.get_text().strip()
@@ -30,37 +36,54 @@ def patch_docx(original_docx_path, html_content, output_docx_path):
                 data = zin.read(item.filename)
                 if item.filename == 'word/document.xml':
                     tree = ET.fromstring(data)
-                    p_nodes = tree.findall('.//w:p', NS)
                     
-                    p_idx = 0
-                    for p in p_nodes:
-                        runs = p.findall('.//w:r', NS)
-                        if not runs:
-                            continue
+                    # Collect XML paragraphs with original index
+                    xml_paragraphs = []
+                    for idx, p in enumerate(tree.findall('.//w:p', NS)):
+                        txt = "".join(p.itertext()).strip()
+                        xml_paragraphs.append({
+                            'elem': p,
+                            'index': idx,
+                            'text': txt,
+                            'matched': False
+                        })
+                    
+                    # Match HTML paragraphs to XML paragraphs using SequenceMatcher fuzzy alignment
+                    for h_text in html_paragraphs:
+                        best_sim = 0.0
+                        best_xml = None
                         
-                        full_p_text = "".join(p.itertext()).strip()
-                        if not full_p_text:
-                            continue
+                        for xml_p in xml_paragraphs:
+                            if xml_p['matched'] or not xml_p['text']:
+                                continue
+                            sim = SequenceMatcher(None, h_text, xml_p['text']).ratio()
+                            if sim > best_sim:
+                                best_sim = sim
+                                best_xml = xml_p
+                                
+                        # Match anchor if similarity >= 20%
+                        if best_sim >= 0.20 and best_xml is not None:
+                            best_xml['matched'] = True
+                            p_elem = best_xml['elem']
+                            runs = p_elem.findall('.//w:r', NS)
                             
-                        if p_idx < len(html_paragraphs):
-                            new_text = html_paragraphs[p_idx]
-                            
-                            first_t = None
-                            for r in runs:
-                                t = r.find('w:t', NS)
-                                if t is not None:
-                                    if first_t is None:
-                                        first_t = t
-                                        first_t.text = new_text
-                                    else:
-                                        t.text = ""
-                            p_idx += 1
+                            if runs:
+                                first_t = None
+                                for r in runs:
+                                    t = r.find('w:t', NS)
+                                    if t is not None:
+                                        if first_t is None:
+                                            first_t = t
+                                            first_t.text = h_text
+                                            first_t.set('{http://www.w3.org/XML/1998/namespace}space', 'preserve')
+                                        else:
+                                            t.text = ""
 
                     data = ET.tostring(tree, encoding='utf-8', xml_declaration=True)
                 zout.writestr(item, data)
 
     os.replace(temp_output_path, output_docx_path)
-    print("Docx patcher successfully updated original docx into", output_docx_path)
+    print("Docx patcher fuzzy matching successfully updated original docx into", output_docx_path)
 
 if __name__ == '__main__':
     if len(sys.argv) < 4:
