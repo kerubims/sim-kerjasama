@@ -10,11 +10,9 @@ import docx
 from docx import Document
 from docx.shared import Pt, RGBColor, Inches, Cm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
-from docx.oxml import OxmlElement, parse_xml
-from docx.oxml.ns import nsdecls, qn
+from docx.enum.table import WD_TABLE_ALIGNMENT
 
-NAMESPACES = {
+NS = {
     'w': 'http://schemas.openxmlformats.org/wordprocessingml/2006/main',
     'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships',
     'a': 'http://schemas.openxmlformats.org/drawingml/2006/main',
@@ -22,285 +20,309 @@ NAMESPACES = {
     'pic': 'http://schemas.openxmlformats.org/drawingml/2006/picture'
 }
 
-for prefix, uri in NAMESPACES.items():
-    ET.register_namespace(prefix, uri)
-
-def parse_docx_to_ast(docx_path):
-    if not zipfile.is_zipfile(docx_path):
-        raise ValueError("File is not a valid docx zip archive.")
+def parse_docx(docx_path):
+    if not os.path.exists(docx_path):
+        return {"version": "2.0", "body": []}
 
     with zipfile.ZipFile(docx_path, 'r') as z:
-        doc_xml = z.read('word/document.xml')
-        rels_xml = z.read('word/_rels/document.xml.rels') if 'word/_rels/document.xml.rels' in z.namelist() else None
+        try:
+            doc_xml = z.read('word/document.xml')
+        except KeyError:
+            return {"version": "2.0", "body": []}
 
-    # Parse relationships
-    rels = {}
-    if rels_xml:
-        rels_tree = ET.fromstring(rels_xml)
-        for rel in rels_tree.findall('{http://schemas.openxmlformats.org/package/2006/relationships}Relationship'):
-            rels[rel.attrib.get('Id')] = rel.attrib.get('Target')
-
-    # Read media images as base64
-    media = {}
-    with zipfile.ZipFile(docx_path, 'r') as z:
-        for name in z.namelist():
-            if name.startswith('word/media/'):
-                img_bytes = z.read(name)
-                ext = name.split('.')[-1].lower()
-                mime = 'image/png' if ext == 'png' else ('image/jpeg' if ext in ['jpg', 'jpeg'] else 'image/gif')
-                b64 = base64.b64encode(img_bytes).decode('utf-8')
-                media[name.replace('word/', '')] = f"data:{mime};base64,{b64}"
+        image_map = {}
+        try:
+            rels_xml = z.read('word/_rels/document.xml.rels')
+            rels_tree = ET.fromstring(rels_xml)
+            for child in rels_tree:
+                r_id = child.attrib.get('Id')
+                target = child.attrib.get('Target')
+                if r_id and target and 'image' in target:
+                    image_path = 'word/' + target if not target.startswith('word/') else target
+                    try:
+                        img_data = z.read(image_path)
+                        ext = image_path.split('.')[-1].lower()
+                        mime = 'image/png' if ext == 'png' else 'image/jpeg'
+                        b64 = base64.b64encode(img_data).decode('utf-8')
+                        image_map[r_id] = f"data:{mime};base64,{b64}"
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     tree = ET.fromstring(doc_xml)
-    body = tree.find('w:body', NAMESPACES)
+    body_elem = tree.find('w:body', NS)
+    if body_elem is None:
+        return {"version": "2.0", "body": []}
 
-    ast = {
-        "version": "1.0",
-        "sections": [],
-        "body": []
-    }
+    body = []
 
-    def parse_run(r_elem):
-        run_data = {
-            "type": "run",
-            "text": "",
-            "bold": False,
-            "italic": False,
-            "underline": False,
-            "fontFamily": None,
-            "fontSize": None,
-            "color": None,
-            "highlight": None,
-            "image": None
-        }
+    for elem in body_elem:
+        tag = elem.tag.split('}')[-1]
 
-        rPr = r_elem.find('w:rPr', NAMESPACES)
-        if rPr is not None:
-            if rPr.find('w:b', NAMESPACES) is not None:
-                run_data["bold"] = True
-            if rPr.find('w:i', NAMESPACES) is not None:
-                run_data["italic"] = True
-            if rPr.find('w:u', NAMESPACES) is not None:
-                run_data["underline"] = True
-            
-            rFonts = rPr.find('w:rFonts', NAMESPACES)
-            if rFonts is not None:
-                run_data["fontFamily"] = rFonts.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii') or rFonts.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}hAnsi')
-            
-            sz = rPr.find('w:sz', NAMESPACES)
-            if sz is not None:
-                val = sz.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
-                if val:
-                    run_data["fontSize"] = float(val) / 2.0  # half-points to pt
+        if tag == 'p':
+            # Check for page break inside paragraph
+            is_page_break = False
+            for br in elem.iter('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}br'):
+                if br.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}type') == 'page':
+                    is_page_break = True
 
-            color = rPr.find('w:color', NAMESPACES)
-            if color is not None:
-                val = color.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
-                if val and val != 'auto':
-                    run_data["color"] = f"#{val}"
+            if is_page_break:
+                body.append({"type": "page_break"})
 
-            highlight = rPr.find('w:highlight', NAMESPACES)
-            if highlight is not None:
-                run_data["highlight"] = highlight.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
+            # Alignment
+            pPr = elem.find('w:pPr', NS)
+            jc_val = 'left'
+            space_before = 0
+            space_after = 0
+            line_height = 1.15
 
-        # Text
-        t_elem = r_elem.find('w:t', NAMESPACES)
-        if t_elem is not None and t_elem.text:
-            run_data["text"] = t_elem.text
+            if pPr is not None:
+                jc = pPr.find('w:jc', NS)
+                if jc is not None:
+                    v = jc.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
+                    if v in ['center', 'right', 'both']:
+                        jc_val = 'justify' if v == 'both' else v
+                spacing = pPr.find('w:spacing', NS)
+                if spacing is not None:
+                    before_str = spacing.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}before')
+                    after_str = spacing.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}after')
+                    if before_str: space_before = int(before_str) // 20
+                    if after_str: space_after = int(after_str) // 20
 
-        # Image (drawing)
-        drawing = r_elem.find('w:drawing', NAMESPACES)
-        if drawing is not None:
-            blip = drawing.find('.//a:blip', NAMESPACES)
-            if blip is not None:
-                embed_id = blip.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
-                target = rels.get(embed_id)
-                if target and target in media:
-                    run_data["image"] = media[target]
+            runs = []
+            for child in elem:
+                ctag = child.tag.split('}')[-1]
+                if ctag == 'r':
+                    rPr = child.find('w:rPr', NS)
+                    bold = False
+                    italic = False
+                    underline = False
+                    font_family = "Times New Roman"
+                    font_size = 12.0
+                    color = None
 
-        return run_data
+                    if rPr is not None:
+                        if rPr.find('w:b', NS) is not None: bold = True
+                        if rPr.find('w:i', NS) is not None: italic = True
+                        if rPr.find('w:u', NS) is not None: underline = True
+                        rFonts = rPr.find('w:rFonts', NS)
+                        if rFonts is not None:
+                            font_family = rFonts.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}ascii') or font_family
+                        sz = rPr.find('w:sz', NS)
+                        if sz is not None:
+                            font_size = float(sz.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val', 24)) / 2.0
+                        col = rPr.find('w:color', NS)
+                        if col is not None:
+                            cval = col.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
+                            if cval and cval != 'auto': color = f"#{cval}"
 
-    def parse_paragraph(p_elem):
-        p_data = {
-            "type": "paragraph",
-            "alignment": "left",
-            "style": "Normal",
-            "runs": []
-        }
+                    # Text or Drawing
+                    for item in child:
+                        itag = item.tag.split('}')[-1]
+                        if itag == 't':
+                            runs.append({
+                                "type": "run",
+                                "text": item.text or "",
+                                "bold": bold,
+                                "italic": italic,
+                                "underline": underline,
+                                "fontFamily": font_family,
+                                "fontSize": font_size,
+                                "color": color
+                            })
+                        elif itag == 'drawing':
+                            blip = item.find('.//a:blip', NS)
+                            if blip is not None:
+                                embed_id = blip.attrib.get('{http://schemas.openxmlformats.org/officeDocument/2006/relationships}embed')
+                                if embed_id in image_map:
+                                    body.append({
+                                        "type": "image",
+                                        "src": image_map[embed_id],
+                                        "alignment": jc_val
+                                    })
 
-        pPr = p_elem.find('w:pPr', NAMESPACES)
-        if pPr is not None:
-            jc = pPr.find('w:jc', NAMESPACES)
-            if jc is not None:
-                p_data["alignment"] = jc.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val', 'left')
+            if len(runs) > 0 or not is_page_break:
+                body.append({
+                    "type": "paragraph",
+                    "alignment": jc_val,
+                    "spaceBefore": space_before,
+                    "spaceAfter": space_after,
+                    "runs": runs
+                })
 
-            pStyle = pPr.find('w:pStyle', NAMESPACES)
-            if pStyle is not None:
-                p_data["style"] = pStyle.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val', 'Normal')
+        elif tag == 'tbl':
+            tblPr = elem.find('w:tblPr', NS)
+            has_borders = False
+            if tblPr is not None:
+                tblBorders = tblPr.find('w:tblBorders', NS)
+                if tblBorders is not None:
+                    for b in tblBorders:
+                        val = b.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
+                        if val and val != 'none':
+                            has_borders = True
+                            break
 
-        for child in p_elem:
-            if child.tag.endswith('r'):
-                p_data["runs"].append(parse_run(child))
+            rows = []
+            for tr in elem.findall('w:tr', NS):
+                cells = []
+                for tc in tr.findall('w:tc', NS):
+                    tcPr = tc.find('w:tcPr', NS)
+                    shd_color = None
+                    if tcPr is not None:
+                        shd = tcPr.find('w:shd', NS)
+                        if shd is not None:
+                            val = shd.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill')
+                            if val and val != 'auto':
+                                shd_color = f"#{val}"
 
-        return p_data
+                    cell_paras = []
+                    for p in tc.findall('w:p', NS):
+                        pPr = p.find('w:pPr', NS)
+                        jc_val = 'left'
+                        if pPr is not None:
+                            jc = pPr.find('w:jc', NS)
+                            if jc is not None:
+                                v = jc.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}val')
+                                if v in ['center', 'right', 'both']:
+                                    jc_val = 'justify' if v == 'both' else v
+                        c_runs = []
+                        for r in p.findall('w:r', NS):
+                            rPr = r.find('w:rPr', NS)
+                            b_flag = False
+                            i_flag = False
+                            if rPr is not None:
+                                if rPr.find('w:b', NS) is not None: b_flag = True
+                                if rPr.find('w:i', NS) is not None: i_flag = True
+                            for t in r.findall('w:t', NS):
+                                c_runs.append({
+                                    "type": "run",
+                                    "text": t.text or "",
+                                    "bold": b_flag,
+                                    "italic": i_flag
+                                })
+                        cell_paras.append({
+                            "type": "paragraph",
+                            "alignment": jc_val,
+                            "runs": c_runs
+                        })
 
-    def parse_table(tbl_elem):
-        tbl_data = {
-            "type": "table",
-            "rows": []
-        }
+                    cells.append({
+                        "shading": shd_color,
+                        "paragraphs": cell_paras if len(cell_paras) > 0 else [{"type": "paragraph", "alignment": "left", "runs": []}]
+                    })
+                if len(cells) > 0:
+                    rows.append({"cells": cells})
 
-        for tr in tbl_elem.findall('w:tr', NAMESPACES):
-            row_data = {"cells": []}
-            for tc in tr.findall('w:tc', NAMESPACES):
-                cell_data = {
-                    "shading": None,
-                    "paragraphs": []
-                }
+            if len(rows) > 0:
+                body.append({
+                    "type": "table",
+                    "hasBorders": has_borders,
+                    "rows": rows
+                })
 
-                tcPr = tc.find('w:tcPr', NAMESPACES)
-                if tcPr is not None:
-                    shd = tcPr.find('w:shd', NAMESPACES)
-                    if shd is not None:
-                        fill = shd.attrib.get('{http://schemas.openxmlformats.org/wordprocessingml/2006/main}fill')
-                        if fill and fill != 'auto':
-                            cell_data["shading"] = f"#{fill}"
+    return {"version": "2.0", "body": body}
 
-                for p in tc.findall('w:p', NAMESPACES):
-                    cell_data["paragraphs"].append(parse_paragraph(p))
-
-                row_data["cells"].append(cell_data)
-
-            tbl_data["rows"].append(row_data)
-
-        return tbl_data
-
-    if body is not None:
-        for elem in body:
-            if elem.tag.endswith('p'):
-                ast["body"].append(parse_paragraph(elem))
-            elif elem.tag.endswith('tbl'):
-                ast["body"].append(parse_table(elem))
-
-    return ast
-
-def ast_to_docx(ast_data, output_path):
+def build_docx(ast_data, output_docx_path):
     doc = Document()
 
-    # Page setup - A4
-    for section in doc.sections:
-        section.page_width = Cm(21.0)
-        section.page_height = Cm(29.7)
+    # Set page margin A4
+    sections = doc.sections
+    for section in sections:
         section.top_margin = Cm(2.5)
         section.bottom_margin = Cm(2.5)
         section.left_margin = Cm(2.0)
         section.right_margin = Cm(2.0)
+        section.page_width = Cm(21.0)
+        section.page_height = Cm(29.7)
 
-    for item in ast_data.get("body", []):
-        if item.get("type") == "paragraph":
+    body = ast_data.get('body', [])
+
+    for item in body:
+        itype = item.get('type')
+        if itype == 'page_break':
+            doc.add_page_break()
+        elif itype == 'image':
+            src = item.get('src', '')
+            if src.startswith('data:image'):
+                header, encoded = src.split(",", 1)
+                img_data = base64.b64decode(encoded)
+                temp_img = output_docx_path + '_img.png'
+                with open(temp_img, 'wb') as f:
+                    f.write(img_data)
+                p = doc.add_paragraph()
+                align = item.get('alignment', 'center')
+                p.alignment = WD_ALIGN_PARAGRAPH.CENTER if align == 'center' else WD_ALIGN_PARAGRAPH.LEFT
+                run = p.add_run()
+                run.add_picture(temp_img, width=Inches(2.5))
+                if os.path.exists(temp_img):
+                    os.remove(temp_img)
+        elif itype == 'paragraph':
             p = doc.add_paragraph()
-            align = item.get("alignment", "left").lower()
-            if align == "center":
-                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            elif align == "right":
-                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-            elif align == "justify":
-                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-            else:
-                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+            align = item.get('alignment', 'left')
+            if align == 'center': p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            elif align == 'right': p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+            elif align == 'justify': p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+            else: p.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-            for r_data in item.get("runs", []):
-                text = r_data.get("text", "")
-                if text:
-                    run = p.add_run(text)
-                    if r_data.get("bold"):
-                        run.bold = True
-                    if r_data.get("italic"):
-                        run.italic = True
-                    if r_data.get("underline"):
-                        run.underline = True
-                    if r_data.get("fontFamily"):
-                        run.font.name = r_data["fontFamily"]
-                    if r_data.get("fontSize"):
-                        run.font.size = Pt(r_data["fontSize"])
-                    if r_data.get("color"):
-                        c = r_data["color"].lstrip('#')
-                        if len(c) == 6:
-                            run.font.color.rgb = RGBColor(int(c[0:2], 16), int(c[2:4], 16), int(c[4:6], 16))
+            for r_data in item.get('runs', []):
+                text = r_data.get('text', '')
+                run = p.add_run(text)
+                if r_data.get('bold'): run.bold = True
+                if r_data.get('italic'): run.italic = True
+                if r_data.get('underline'): run.underline = True
+                font_fam = r_data.get('fontFamily')
+                if font_fam: run.font.name = font_fam
+                font_sz = r_data.get('fontSize')
+                if font_sz: run.font.size = Pt(font_sz)
+                color = r_data.get('color')
+                if color and color.startswith('#') and len(color) == 7:
+                    try:
+                        r_hex = int(color[1:3], 16)
+                        g_hex = int(color[3:5], 16)
+                        b_hex = int(color[5:7], 16)
+                        run.font.color.rgb = RGBColor(r_hex, g_hex, b_hex)
+                    except Exception:
+                        pass
+        elif itype == 'table':
+            rows_data = item.get('rows', [])
+            if not rows_data: continue
+            num_rows = len(rows_data)
+            num_cols = max(len(r.get('cells', [])) for r in rows_data)
+            if num_cols == 0: continue
 
-        elif item.get("type") == "table":
-            rows = item.get("rows", [])
-            if not rows:
-                continue
-            num_rows = len(rows)
-            num_cols = max([len(r.get("cells", [])) for r in rows]) if rows else 0
-            
-            table = doc.add_table(rows=num_rows, cols=num_cols)
-            table.alignment = WD_TABLE_ALIGNMENT.CENTER
+            tbl = doc.add_table(rows=num_rows, cols=num_cols)
+            tbl.alignment = WD_TABLE_ALIGNMENT.CENTER
 
-            for r_idx, r_data in enumerate(rows):
-                for c_idx, c_data in enumerate(r_data.get("cells", [])):
-                    if c_idx >= num_cols:
-                        break
-                    cell = table.cell(r_idx, c_idx)
-                    shading = c_data.get("shading")
-                    if shading:
-                        hex_c = shading.lstrip('#')
-                        shd_elm = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{hex_c}"/>')
-                        cell._tc.get_or_add_tcPr().append(shd_elm)
+            for r_idx, r_data in enumerate(rows_data):
+                for c_idx, c_data in enumerate(r_data.get('cells', [])):
+                    if c_idx >= num_cols: continue
+                    cell = tbl.cell(r_idx, c_idx)
+                    cell.text = ''
+                    for p_data in c_data.get('paragraphs', []):
+                        cp = cell.add_paragraph()
+                        align = p_data.get('alignment', 'left')
+                        if align == 'center': cp.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                        elif align == 'right': cp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+                        elif align == 'justify': cp.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
 
-                    # Paragraphs in cell
-                    cell_paras = c_data.get("paragraphs", [])
-                    if cell_paras:
-                        p = cell.paragraphs[0]
-                        for idx, p_data in enumerate(cell_paras):
-                            if idx > 0:
-                                p = cell.add_paragraph()
-                            align = p_data.get("alignment", "left").lower()
-                            if align == "center":
-                                p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                            elif align == "right":
-                                p.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-                            elif align == "justify":
-                                p.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                            else:
-                                p.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                        for r_item in p_data.get('runs', []):
+                            c_run = cp.add_run(r_item.get('text', ''))
+                            if r_item.get('bold'): c_run.bold = True
+                            if r_item.get('italic'): c_run.italic = True
 
-                            for r_data in p_data.get("runs", []):
-                                text = r_data.get("text", "")
-                                if text:
-                                    run = p.add_run(text)
-                                    if r_data.get("bold"):
-                                        run.bold = True
-                                    if r_data.get("italic"):
-                                        run.italic = True
-                                    if r_data.get("underline"):
-                                        run.underline = True
-                                    if r_data.get("fontFamily"):
-                                        run.font.name = r_data["fontFamily"]
-                                    if r_data.get("fontSize"):
-                                        run.font.size = Pt(r_data["fontSize"])
-
-    doc.save(output_path)
+    doc.save(output_docx_path)
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
-        print("Usage: DocxAST.py <command> <input_file> [output_file]")
-        print("Commands: parse | build")
+        print("Usage: DocxAST.py parse <docx_file> | build <ast_json> <output_docx>")
         sys.exit(1)
 
     cmd = sys.argv[1]
-    input_file = sys.argv[2]
-
-    if cmd == "parse":
-        ast = parse_docx_to_ast(input_file)
-        print(json.dumps(ast, indent=2))
-    elif cmd == "build":
-        if len(sys.argv) < 4:
-            print("Output path required for build command.")
-            sys.exit(1)
-        output_file = sys.argv[3]
-        with open(input_file, 'r', encoding='utf-8') as f:
-            ast_data = json.load(f)
-        ast_to_docx(ast_data, output_file)
-        print(f"Built DOCX successfully to {output_file}")
+    if cmd == 'parse':
+        res = parse_docx(sys.argv[2])
+        print(json.dumps(res, indent=2))
+    elif cmd == 'build':
+        with open(sys.argv[2], 'r') as f:
+            data = json.load(f)
+        build_docx(data, sys.argv[3])

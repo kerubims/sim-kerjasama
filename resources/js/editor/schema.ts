@@ -10,6 +10,8 @@ const nodes: Record<string, NodeSpec> = {
     attrs: {
       alignment: { default: 'left' },
       style: { default: 'Normal' },
+      spaceBefore: { default: 0 },
+      spaceAfter: { default: 0 },
     },
     parseDOM: [
       {
@@ -25,19 +27,60 @@ const nodes: Record<string, NodeSpec> = {
     toDOM: (node) => [
       'p',
       {
-        style: `text-align: ${node.attrs.alignment}; margin-top: 4px; margin-bottom: 8px;`,
+        style: `text-align: ${node.attrs.alignment}; margin-top: ${node.attrs.spaceBefore || 0}pt; margin-bottom: ${node.attrs.spaceAfter || 0}pt;`,
+        class: `text-${node.attrs.alignment}`,
       },
       0,
     ],
   },
-  text: {
-    group: 'inline',
+  image: {
+    group: 'block',
+    inline: false,
+    attrs: {
+      src: {},
+      alignment: { default: 'center' },
+    },
+    parseDOM: [
+      {
+        tag: 'img[src]',
+        getAttrs: (dom) => {
+          const el = dom as HTMLImageElement;
+          return { src: el.getAttribute('src') };
+        },
+      },
+    ],
+    toDOM: (node) => [
+      'div',
+      { style: `text-align: ${node.attrs.alignment || 'center'}; margin: 1.5rem 0;` },
+      ['img', { src: node.attrs.src, style: 'max-width: 180px; height: auto; display: inline-block;' }],
+    ],
+  },
+  page_break: {
+    group: 'block',
+    inline: false,
+    toDOM: () => [
+      'div',
+      {
+        class: 'page-break-divider',
+        style: 'border-top: 2px dashed #94a3b8; margin: 3rem 0; text-align: center; color: #64748b; font-size: 11px; font-weight: bold; position: relative;',
+      },
+      '--- LEMBAR BARU (A4 PAGE BREAK) ---',
+    ],
   },
   table: {
     content: 'table_row+',
     group: 'block',
+    attrs: {
+      hasBorders: { default: false },
+    },
     parseDOM: [{ tag: 'table' }],
-    toDOM: () => ['table', { style: 'width: 100%; border-collapse: collapse; margin: 12px 0;' }, ['tbody', 0]],
+    toDOM: (node) => [
+      'table',
+      {
+        style: `width: 100%; border-collapse: collapse; margin: 1rem 0; ${node.attrs.hasBorders ? 'border: 1px solid #000;' : 'border: 1px dashed #cbd5e1;'}`,
+      },
+      ['tbody', 0],
+    ],
   },
   table_row: {
     content: 'table_cell+',
@@ -53,10 +96,13 @@ const nodes: Record<string, NodeSpec> = {
     toDOM: (node) => [
       'td',
       {
-        style: `border: 1px solid #cbd5e1; padding: 6px 10px; background-color: ${node.attrs.shading || 'transparent'};`,
+        style: `padding: 8px 12px; vertical-align: top; border: 1px dashed #cbd5e1; background-color: ${node.attrs.shading || 'transparent'};`,
       },
       0,
     ],
+  },
+  text: {
+    group: 'inline',
   },
 };
 
@@ -78,36 +124,30 @@ const marks: Record<string, MarkSpec> = {
     parseDOM: [
       {
         style: 'font-family',
-        getAttrs: (value) => ({ family: typeof value === 'string' ? value.replace(/["']/g, '') : 'Times New Roman' }),
+        getAttrs: (value) => ({ family: value }),
       },
     ],
-    toDOM: (mark) => ['span', { style: `font-family: '${mark.attrs.family}', serif;` }, 0],
+    toDOM: (mark) => ['span', { style: `font-family: "${mark.attrs.family}", serif` }, 0],
   },
   fontSize: {
     attrs: { size: { default: 12 } },
     parseDOM: [
       {
         style: 'font-size',
-        getAttrs: (value) => {
-          if (typeof value === 'string') {
-            const num = parseFloat(value);
-            return { size: isNaN(num) ? 12 : num };
-          }
-          return { size: 12 };
-        },
+        getAttrs: (value) => ({ size: parseFloat(value as string) }),
       },
     ],
-    toDOM: (mark) => ['span', { style: `font-size: ${mark.attrs.size}pt;` }, 0],
+    toDOM: (mark) => ['span', { style: `font-size: ${mark.attrs.size}pt` }, 0],
   },
   color: {
     attrs: { hex: { default: '#000000' } },
     parseDOM: [
       {
         style: 'color',
-        getAttrs: (value) => ({ hex: typeof value === 'string' ? value : '#000000' }),
+        getAttrs: (value) => ({ hex: value }),
       },
     ],
-    toDOM: (mark) => ['span', { style: `color: ${mark.attrs.hex};` }, 0],
+    toDOM: (mark) => ['span', { style: `color: ${mark.attrs.hex}` }, 0],
   },
 };
 

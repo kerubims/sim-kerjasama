@@ -14,8 +14,19 @@ export interface AstRun {
 export interface AstParagraph {
   type: 'paragraph';
   alignment?: string;
-  style?: string;
+  spaceBefore?: number;
+  spaceAfter?: number;
   runs: AstRun[];
+}
+
+export interface AstImage {
+  type: 'image';
+  src: string;
+  alignment?: string;
+}
+
+export interface AstPageBreak {
+  type: 'page_break';
 }
 
 export interface AstTableCell {
@@ -29,10 +40,11 @@ export interface AstTableRow {
 
 export interface AstTable {
   type: 'table';
+  hasBorders?: boolean;
   rows: AstTableRow[];
 }
 
-export type AstItem = AstParagraph | AstTable;
+export type AstItem = AstParagraph | AstImage | AstPageBreak | AstTable;
 
 export interface AstData {
   version: string;
@@ -43,7 +55,11 @@ export function astToProseMirrorDoc(ast: AstData, schema: Schema): PMNode {
   const pmBlocks: PMNode[] = [];
 
   for (const item of ast.body || []) {
-    if (item.type === 'paragraph') {
+    if (item.type === 'page_break') {
+      pmBlocks.push(schema.nodes.page_break.create());
+    } else if (item.type === 'image') {
+      pmBlocks.push(schema.nodes.image.create({ src: item.src, alignment: item.alignment || 'center' }));
+    } else if (item.type === 'paragraph') {
       const inlineNodes = (item.runs || []).map((r) => {
         const marks = [];
         if (r.bold) marks.push(schema.marks.bold.create());
@@ -57,7 +73,7 @@ export function astToProseMirrorDoc(ast: AstData, schema: Schema): PMNode {
       });
 
       const pNode = schema.nodes.paragraph.create(
-        { alignment: item.alignment || 'left', style: item.style || 'Normal' },
+        { alignment: item.alignment || 'left', spaceBefore: item.spaceBefore || 0, spaceAfter: item.spaceAfter || 0 },
         inlineNodes.length > 0 ? inlineNodes : undefined
       );
       pmBlocks.push(pNode);
@@ -91,7 +107,7 @@ export function astToProseMirrorDoc(ast: AstData, schema: Schema): PMNode {
         }
       }
       if (pmRows.length > 0) {
-        pmBlocks.push(schema.nodes.table.create(null, pmRows));
+        pmBlocks.push(schema.nodes.table.create({ hasBorders: item.hasBorders || false }, pmRows));
       }
     }
   }
@@ -103,7 +119,11 @@ export function proseMirrorDocToAst(docNode: PMNode): AstData {
   const body: AstItem[] = [];
 
   docNode.forEach((node) => {
-    if (node.type.name === 'paragraph') {
+    if (node.type.name === 'page_break') {
+      body.push({ type: 'page_break' });
+    } else if (node.type.name === 'image') {
+      body.push({ type: 'image', src: node.attrs.src, alignment: node.attrs.alignment || 'center' });
+    } else if (node.type.name === 'paragraph') {
       const runs: AstRun[] = [];
       node.forEach((child) => {
         if (child.isText) {
@@ -128,7 +148,6 @@ export function proseMirrorDocToAst(docNode: PMNode): AstData {
       body.push({
         type: 'paragraph',
         alignment: node.attrs.alignment || 'left',
-        style: node.attrs.style || 'Normal',
         runs,
       });
     } else if (node.type.name === 'table') {
@@ -162,9 +181,9 @@ export function proseMirrorDocToAst(docNode: PMNode): AstData {
         });
         rows.push({ cells });
       });
-      body.push({ type: 'table', rows });
+      body.push({ type: 'table', hasBorders: node.attrs.hasBorders || false, rows });
     }
   });
 
-  return { version: '1.0', body };
+  return { version: '2.0', body };
 }
