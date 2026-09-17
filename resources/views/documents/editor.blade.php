@@ -307,6 +307,7 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script src="/vendor/tinymce/tinymce.min.js"></script>
 <script>
 window.uploadDocxFile = function(inputEl) {
@@ -318,51 +319,44 @@ window.uploadDocxFile = function(inputEl) {
     formData.append('docx_file', file);
     formData.append('_token', csrfToken);
 
-    Swal.fire({
-        title: 'Proses Import Dokumen',
-        html: `
-            <div style="margin-top: 10px;">
-                <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px;" id="import-status-title">Memulai pengunggahan...</div>
-                <div style="width: 100%; background-color: #e2e8f0; border-radius: 9999px; height: 14px; overflow: hidden; margin: 12px 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
-                    <div id="import-progress-bar" style="width: 0%; height: 100%; background-color: #2563eb; border-radius: 9999px; transition: width 0.2s ease-in-out;"></div>
-                </div>
-                <div id="import-progress-text" style="font-size: 13px; color: #64748b; font-weight: 500;">0% selesai</div>
-            </div>
-        `,
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        showConfirmButton: false,
-        didOpen: () => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', '/documents/import-docx', true);
-            xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
+    function closeProgressModal() {
+        if (typeof Swal !== 'undefined' && Swal.isVisible()) Swal.close();
+        const overlay = document.getElementById('docx-import-modal-overlay');
+        if (overlay) overlay.style.display = 'none';
+    }
 
-            xhr.upload.onprogress = (event) => {
-                if (event.lengthComputable) {
-                    const percent = Math.round((event.loaded / event.total) * 100);
-                    const bar = document.getElementById('import-progress-bar');
-                    const text = document.getElementById('import-progress-text');
-                    const title = document.getElementById('import-status-title');
+    function startXHRUpload() {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/documents/import-docx', true);
+        xhr.setRequestHeader('X-CSRF-TOKEN', csrfToken);
 
-                    if (bar) bar.style.width = percent + '%';
-                    if (text) text.textContent = percent + '% selesai';
-                    if (title) {
-                        title.textContent = percent < 100 
-                            ? `Mengunggah berkas (${(event.loaded / (1024*1024)).toFixed(2)} MB)...` 
-                            : 'Mengonversi struktur Word 1:1...';
-                    }
+        xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+                const percent = Math.round((event.loaded / event.total) * 100);
+                const bar = document.getElementById('import-progress-bar');
+                const text = document.getElementById('import-progress-text');
+                const title = document.getElementById('import-status-title');
+
+                if (bar) bar.style.width = percent + '%';
+                if (text) text.textContent = percent + '% selesai';
+                if (title) {
+                    title.textContent = percent < 100 
+                        ? `Mengunggah berkas (${(event.loaded / (1024*1024)).toFixed(2)} MB)...` 
+                        : 'Mengonversi struktur Word 1:1...';
                 }
-            };
+            }
+        };
 
-            xhr.onload = () => {
-                Swal.close();
-                try {
-                    const data = JSON.parse(xhr.responseText);
-                    if (xhr.status === 200 && data.success && data.html) {
-                        const editor = typeof tinymce !== 'undefined' ? tinymce.get('editor-area') : null;
-                        if (editor) {
-                            editor.setContent(data.html);
-                        }
+        xhr.onload = () => {
+            closeProgressModal();
+            try {
+                const data = JSON.parse(xhr.responseText);
+                if (xhr.status === 200 && data.success && data.html) {
+                    const editor = typeof tinymce !== 'undefined' ? tinymce.get('editor-area') : null;
+                    if (editor) {
+                        editor.setContent(data.html);
+                    }
+                    if (typeof Swal !== 'undefined') {
                         Swal.fire({
                             icon: 'success',
                             title: 'Import Berhasil!',
@@ -371,21 +365,76 @@ window.uploadDocxFile = function(inputEl) {
                             showConfirmButton: false
                         });
                     } else {
-                        Swal.fire('Gagal Import', data.message || 'Gagal konversi file DOCX', 'error');
+                        alert('Import Berhasil! Dokumen Word 1:1 berhasil dimuat ke dalam editor.');
                     }
-                } catch (err) {
-                    Swal.fire('Error', 'Gagal memproses respon dari server.', 'error');
+                } else {
+                    if (typeof Swal !== 'undefined') {
+                        Swal.fire('Gagal Import', data.message || 'Gagal konversi file DOCX', 'error');
+                    } else {
+                        alert('Gagal Import: ' + (data.message || 'Gagal konversi file DOCX'));
+                    }
                 }
-            };
+            } catch (err) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire('Error', 'Gagal memproses respon dari server.', 'error');
+                } else {
+                    alert('Error: Gagal memproses respon dari server.');
+                }
+            }
+        };
 
-            xhr.onerror = () => {
-                Swal.close();
+        xhr.onerror = () => {
+            closeProgressModal();
+            if (typeof Swal !== 'undefined') {
                 Swal.fire('Error', 'Terjadi kesalahan jaringan saat mengunggah file.', 'error');
-            };
+            } else {
+                alert('Error: Terjadi kesalahan jaringan saat mengunggah file.');
+            }
+        };
 
-            xhr.send(formData);
+        xhr.send(formData);
+    }
+
+    // Show Progress Modal
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Proses Import Dokumen',
+            html: `
+                <div style="margin-top: 10px;">
+                    <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px;" id="import-status-title">Memulai pengunggahan...</div>
+                    <div style="width: 100%; background-color: #e2e8f0; border-radius: 9999px; height: 14px; overflow: hidden; margin: 12px 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                        <div id="import-progress-bar" style="width: 0%; height: 100%; background-color: #2563eb; border-radius: 9999px; transition: width 0.2s ease-in-out;"></div>
+                    </div>
+                    <div id="import-progress-text" style="font-size: 13px; color: #64748b; font-weight: 500;">0% selesai</div>
+                </div>
+            `,
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            showConfirmButton: false,
+            didOpen: () => startXHRUpload()
+        });
+    } else {
+        let overlay = document.getElementById('docx-import-modal-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'docx-import-modal-overlay';
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:99999;display:flex;align-items:center;justify-content:center;';
+            overlay.innerHTML = `
+                <div style="background:white;padding:24px;border-radius:12px;width:90%;max-width:400px;box-shadow:0 10px 25px rgba(0,0,0,0.2);text-align:center;font-family:sans-serif;">
+                    <h3 style="margin:0 0 12px;font-size:18px;font-weight:700;color:#1e293b;">Proses Import Dokumen</h3>
+                    <div id="import-status-title" style="font-size:14px;font-weight:600;color:#334155;margin-bottom:8px;">Memulai pengunggahan...</div>
+                    <div style="width:100%;background:#e2e8f0;border-radius:9999px;height:14px;overflow:hidden;margin:12px 0;">
+                        <div id="import-progress-bar" style="width:0%;height:100%;background:#2563eb;transition:width 0.2s ease;"></div>
+                    </div>
+                    <div id="import-progress-text" style="font-size:13px;color:#64748b;font-weight:500;">0% selesai</div>
+                </div>
+            `;
+            document.body.appendChild(overlay);
+        } else {
+            overlay.style.display = 'flex';
         }
-    });
+        startXHRUpload();
+    }
 };
 
 function editorPage() {
