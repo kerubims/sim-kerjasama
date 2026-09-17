@@ -81,25 +81,27 @@ export default function DocxEditor({ document: doc, canEdit }: DocxEditorProps) 
       });
 
       const csrfToken = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content;
-      const res = await fetch(`/documents/${doc.id}/editor`, {
+      const res = await fetch(`/documents/${doc.id}/save-canvas-edits`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRF-TOKEN': csrfToken,
         },
-        body: JSON.stringify({ content: combinedHtml }),
+        body: JSON.stringify({ html: combinedHtml }),
       });
 
-      if (res.ok) {
+      const data = await res.json();
+      if (res.ok && data.success) {
         Swal.fire({
           icon: 'success',
-          title: 'Tersimpan!',
-          text: 'Perubahan dokumen berhasil disimpan.',
+          title: 'Tersimpan 1:1!',
+          text: 'Perubahan dokumen berhasil disimpan ke berkas DOCX.',
           timer: 1800,
           showConfirmButton: false,
         });
+        loadDocx();
       } else {
-        Swal.fire('Gagal Menyimpan', 'Terjadi kesalahan pada server.', 'error');
+        Swal.fire('Gagal Menyimpan', data.message || 'Terjadi kesalahan pada server.', 'error');
       }
     } catch (err) {
       Swal.fire('Error', 'Gagal koneksi ke server.', 'error');

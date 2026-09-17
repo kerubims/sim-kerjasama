@@ -67,6 +67,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/documents/{id}/editor', [DocumentController::class, 'editor'])->name('documents.editor');
     Route::get('/documents/{id}/docx-editor', [DocxEditorController::class, 'editor'])->name('documents.docx-editor');
     Route::post('/documents/{id}/ast', [DocxEditorController::class, 'saveAst'])->name('documents.save-ast');
+    Route::post('/documents/{id}/save-canvas-edits', [DocxEditorController::class, 'saveCanvasEdits'])->name('documents.save-canvas-edits');
     Route::post('/documents/{id}/upload-docx', [DocxEditorController::class, 'uploadDocx'])->name('documents.upload-docx');
     Route::get('/documents/{id}/download-docx', [DocxEditorController::class, 'downloadDocx'])->name('documents.download-docx');
     Route::get('/documents/{id}/download-pdf', [DocxEditorController::class, 'downloadPdf'])->name('documents.download-pdf');

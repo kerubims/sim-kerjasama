@@ -72,6 +72,42 @@ class DocxEditorController extends Controller
         return response()->json(['success' => false, 'message' => 'Gagal membuat file DOCX.'], 500);
     }
 
+    public function saveCanvasEdits(Request $request, $id)
+    {
+        $document = Document::findOrFail($id);
+        $html = $request->input('html');
+
+        if (!$html) {
+            return response()->json(['success' => false, 'message' => 'Konten edit kosong.'], 400);
+        }
+
+        $document->content = $html;
+        $document->save();
+
+        $tempHtml = storage_path('app/edit_' . uniqid() . '.html');
+        $docxPath = storage_path('app/documents/doc_' . $document->id . '.docx');
+        if (!file_exists(dirname($docxPath))) {
+            mkdir(dirname($docxPath), 0755, true);
+        }
+
+        file_put_contents($tempHtml, $html);
+
+        $pythonBin = '/home/ubs/.hermes/hermes-agent/venv/bin/python3';
+        $scriptPath = base_path('app/Services/DocxExporter.py');
+
+        $command = escapeshellcmd("$pythonBin $scriptPath " . escapeshellarg($tempHtml) . ' ' . escapeshellarg($docxPath));
+        shell_exec($command);
+
+        if (file_exists($tempHtml)) {
+            @unlink($tempHtml);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Perubahan dokumen berhasil disimpan ke file DOCX 1:1.'
+        ]);
+    }
+
     public function uploadDocx(Request $request, $id)
     {
         $request->validate([
