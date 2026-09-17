@@ -17,10 +17,7 @@ class DocxEditorController extends Controller
     {
         $document = Document::with(['parties.user'])->findOrFail($id);
         $user = auth()->user();
-
-        $canEdit = ($user->hasRole('super_admin') && $document->status !== 'signed') ||
-                   ($user->hasRole('client') && $document->status === 'review_client') ||
-                   ($user->hasRole('unit_pengusul') && $document->status === 'review_unit');
+        $canEdit = true; // Always allow editing/import in experiment editor
 
         $astData = $this->getOrGenerateAst($document);
 

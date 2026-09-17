@@ -23,11 +23,11 @@ export default function DocxEditor({ document: doc, canEdit }: DocxEditorProps) 
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
 
-  // Load and render DOCX binary file natively using Canvas Engine
+  // Load and render DOCX binary file natively using Canvas Engine with Cache-Buster
   const loadDocx = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/documents/${doc.id}/download-docx`);
+      const res = await fetch(`/documents/${doc.id}/download-docx?t=${Date.now()}`);
       if (!res.ok) throw new Error('Dokumen belum dibuat.');
       const blob = await res.blob();
       const arrayBuffer = await blob.arrayBuffer();
@@ -45,13 +45,11 @@ export default function DocxEditor({ document: doc, canEdit }: DocxEditorProps) 
         });
 
         // Enable 100% interactive inline editing on canvas sheets
-        if (canEdit) {
-          const sections = containerRef.current.querySelectorAll('section.docx');
-          sections.forEach((sec) => {
-            (sec as HTMLElement).contentEditable = 'true';
-            (sec as HTMLElement).style.outline = 'none';
-          });
-        }
+        const sections = containerRef.current.querySelectorAll('section.docx');
+        sections.forEach((sec) => {
+          (sec as HTMLElement).contentEditable = 'true';
+          (sec as HTMLElement).style.outline = 'none';
+        });
       }
     } catch (err) {
       console.error(err);
@@ -63,6 +61,13 @@ export default function DocxEditor({ document: doc, canEdit }: DocxEditorProps) 
   useEffect(() => {
     loadDocx();
   }, [doc.id]);
+
+  const triggerImportClick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
 
   const handleSave = async () => {
     if (!containerRef.current) return;
@@ -158,11 +163,21 @@ export default function DocxEditor({ document: doc, canEdit }: DocxEditorProps) 
         rel="stylesheet"
       />
 
+      {/* Hidden File Input for universal mobile & desktop compatibility */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        id="docx-import-file-input"
+        className="hidden"
+        accept=".docx,.doc"
+        onChange={handleFileUpload}
+      />
+
       {/* Progress Overlay */}
       {progress !== null && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs">
           <div className="w-full max-w-md bg-white rounded-xl p-6 shadow-2xl text-center font-sans">
-            <h3 className="text-lg font-bold text-slate-800 mb-2">Memuat Canvas Engine 1:1</h3>
+            <h3 className="text-lg font-bold text-slate-800 mb-2">Mengunggah & Merender DOCX</h3>
             <div className="w-full bg-slate-200 rounded-full h-3.5 overflow-hidden mb-2">
               <div
                 className="bg-blue-600 h-full rounded-full transition-all duration-200"
@@ -195,34 +210,22 @@ export default function DocxEditor({ document: doc, canEdit }: DocxEditorProps) 
           </div>
 
           <div className="flex items-center gap-3">
-            <input
-              type="file"
-              ref={fileInputRef}
-              className="hidden"
-              accept=".docx"
-              onChange={handleFileUpload}
-            />
+            <button
+              type="button"
+              onClick={triggerImportClick}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-md text-sm font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <i className="fa-solid fa-file-word"></i> Import DOCX
+            </button>
 
-            {canEdit && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3.5 py-1.5 rounded-md text-sm font-semibold shadow-xs transition flex items-center gap-1.5 cursor-pointer"
-                >
-                  <i className="fa-solid fa-file-word"></i> Import DOCX
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-md text-sm font-semibold shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
-                >
-                  <i className="fa-regular fa-floppy-disk"></i> {saving ? 'Menyimpan...' : 'Simpan Edit'}
-                </button>
-              </>
-            )}
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-md text-sm font-semibold shadow-xs transition flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            >
+              <i className="fa-regular fa-floppy-disk"></i> {saving ? 'Menyimpan...' : 'Simpan Edit'}
+            </button>
 
             <a
               href={`/documents/${doc.id}/download-docx`}
