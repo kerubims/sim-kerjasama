@@ -256,7 +256,22 @@ class DocumentController extends Controller
             // unit_pengusul can see all statuses as long as they are a party
         }
 
-        return view('documents.editor', ['doc' => $document]);
+        $party = DocumentParty::where('document_id', $id)
+                              ->where('user_id', $user->id)
+                              ->first();
+        $userHasSigned = $party && $party->signature_path;
+
+        $canEdit = !$userHasSigned && (
+            ($user->hasRole('super_admin') && $document->status !== 'signed') ||
+            ($user->hasRole('client') && $document->status === 'review_client') ||
+            ($user->hasRole('unit_pengusul') && $document->status === 'review_unit')
+        );
+
+        return view('documents.editor', [
+            'doc' => $document,
+            'canEdit' => $canEdit,
+            'canImportDocx' => $canEdit,
+        ]);
     }
 
     public function preview($id)

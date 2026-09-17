@@ -27,7 +27,10 @@ def half_pt_to_px(val):
 
 def parse_docx_to_html(docx_path):
     if not os.path.exists(docx_path):
-        return f"<p>Error: File {docx_path} not found.</p>"
+        return f"<p>Error: File {docx_path} tidak ditemukan.</p>"
+
+    if not zipfile.is_zipfile(docx_path):
+        return "<p style='color: red; font-weight: bold;'>Format file .doc (Word 97-2003) tidak didukung secara langsung. Silakan buka file tersebut di Microsoft Word lalu simpan ulang sebagai <u>.docx</u> (Word Document) sebelum meng-import ke sistem.</p>"
 
     try:
         with zipfile.ZipFile(docx_path, 'r') as z:

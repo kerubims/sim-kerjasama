@@ -325,7 +325,7 @@ function editorPage() {
 
         init() {
             const canEdit = @json($canEdit);
-            const canImportDocx = @json($canImportDocx ?? false);
+            const canImportDocx = @json($canImportDocx ?? $canEdit);
             const editorArea = document.getElementById('editor-area');
 
             if (editorArea) {
@@ -336,7 +336,7 @@ function editorPage() {
                         onAction: () => {
                             const input = document.createElement('input');
                             input.type = 'file';
-                            input.accept = '.docx';
+                            input.accept = '.docx, .doc, application/vnd.openxmlformats-officedocument.wordprocessingml.document, application/msword';
                             input.onchange = (e) => {
                                 const file = e.target.files[0];
                                 if (file) {
