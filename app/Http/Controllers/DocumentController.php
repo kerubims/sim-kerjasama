@@ -813,4 +813,33 @@ class DocumentController extends Controller
             'html'    => $output,
         ]);
     }
+
+    public function exportDocx($id)
+    {
+        $document = Document::findOrFail($id);
+
+        if (!$document->content) {
+            return response()->json(['success' => false, 'message' => 'Dokumen belum memiliki konten.'], 400);
+        }
+
+        $tempHtml = storage_path('app/export_' . uniqid() . '.html');
+        $tempDocx = storage_path('app/export_' . uniqid() . '.docx');
+        file_put_contents($tempHtml, $document->content);
+
+        $pythonBin = '/home/ubs/.hermes/hermes-agent/venv/bin/python3';
+        $scriptPath = base_path('app/Services/DocxExporter.py');
+
+        $command = escapeshellcmd("$pythonBin $scriptPath " . escapeshellarg($tempHtml) . ' ' . escapeshellarg($tempDocx));
+        shell_exec($command);
+
+        if (file_exists($tempHtml)) {
+            @unlink($tempHtml);
+        }
+
+        if (file_exists($tempDocx)) {
+            return response()->download($tempDocx, \Illuminate\Support\Str::slug($document->title) . '.docx')->deleteFileAfterSend(true);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Gagal meng-export berkas DOCX.'], 500);
+    }
 }

@@ -66,6 +66,16 @@
             </button>
             @endif
 
+            {{-- Export Buttons --}}
+            @if(!$doc->file_path)
+            <a href="{{ route('documents.export-docx', $doc->id) }}" target="_blank" class="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md text-sm font-medium shadow-sm transition inline-flex items-center gap-1">
+                <i class="fa-solid fa-file-word"></i> Export DOCX
+            </a>
+            <button @click="exportPdf()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm ml-2 transition">
+                <i class="fa-solid fa-file-pdf mr-1"></i> Export PDF
+            </button>
+            @endif
+
             {{-- Workflow Buttons --}}
             @if($user->hasRole('super_admin') && $doc->status === 'draft')
             <button @click="showSendModal=true" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium shadow-sm transition">

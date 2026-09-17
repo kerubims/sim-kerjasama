@@ -66,6 +66,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/documents/{id}/editor', [DocumentController::class, 'editor'])->name('documents.editor');
     Route::get('/documents/{id}/preview', [DocumentController::class, 'preview'])->name('documents.preview');
     Route::get('/documents/{id}/export-pdf', [DocumentController::class, 'exportPdf'])->name('documents.export-pdf');
+    Route::get('/documents/{id}/export-docx', [DocumentController::class, 'exportDocx'])->name('documents.export-docx');
     Route::post('/documents/import-docx', [DocumentController::class, 'importDocx'])->name('documents.import-docx');
     Route::put('/documents/{id}/content', [DocumentController::class, 'updateContent'])->name('documents.updateContent');
     Route::put('/documents/{id}/status', [DocumentController::class, 'updateStatus'])->name('documents.updateStatus');
