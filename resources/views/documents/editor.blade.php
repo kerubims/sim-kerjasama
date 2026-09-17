@@ -1077,14 +1077,19 @@ function editorPage() {
         },
 
         exportPdf() {
-            alert('Sedang menyiapkan PDF, mohon tunggu sebentar...');
+            alert('Sedang menyiapkan PDF presisi A4, mohon tunggu sebentar...');
             const content = tinymce.get('editor-area').getContent();
             const el = document.createElement('div');
-            // Menyamakan style font dengan editor TinyMCE
-            el.style.fontFamily = 'Tahoma, "Times New Roman", Times, serif';
-            el.style.fontSize = '11pt';
-            el.style.lineHeight = '1.5';
-            el.style.color = '#000000';
+            // Menyalin style presisi dari TinyMCE editor (docx-document-canvas)
+            el.style.fontFamily = 'inherit';
+            el.style.fontSize = 'inherit';
+            el.style.lineHeight = 'inherit';
+            el.style.color = 'inherit';
+            el.style.width = '21cm';
+            el.style.minHeight = '29.7cm';
+            el.style.padding = '2.5cm 2cm';
+            el.style.background = '#ffffff';
+            el.style.boxSizing = 'border-box';
             el.innerHTML = content;
 
             // MENGHAPUS HIGHLIGHT KUNING: 
@@ -1130,21 +1135,20 @@ function editorPage() {
 
             if (typeof html2pdf !== 'undefined') {
                 html2pdf().set({
-                    margin: 0.75, // Margin 0.75 inci untuk seluruh sisi (kiri, kanan, atas, bawah)
+                    margin: 0, // Margin 0 - editor sudah punya padding A4 presisi
                     filename: '{{ $doc->title }}.pdf',
                     image: {type:'jpeg',quality:0.98},
                     html2canvas: {
                         scale: 2, 
                         useCORS: true,
-                        // Trik jitu ke-3: Mencegah error 'oklch' dari Tailwind dengan cara 
-                        // mengabaikan semua tag <style> dan <link> saat html2canvas melakukan cloning.
-                        // Ini jauh lebih aman dan tidak menyebabkan tampilan utama berkedip.
+                        // Preserve all inline styles from imported DOCX
                         ignoreElements: function(element) {
                             const tag = element.tagName ? element.tagName.toLowerCase() : '';
-                            return tag === 'style' || tag === 'link';
+                            // Keep style/link tags but strip comment markers
+                            return false;
                         }
                     },
-                    jsPDF: {unit:'in',format:'letter',orientation:'portrait'}
+                    jsPDF: {unit:'mm',format:'a4',orientation:'portrait'}
                 }).from(el).save().catch(err => {
                     console.error('PDF Export Error:', err);
                     alert('Gagal membuat PDF: ' + (err.message || err));
