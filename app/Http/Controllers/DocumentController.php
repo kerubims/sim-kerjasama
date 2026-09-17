@@ -765,4 +765,37 @@ class DocumentController extends Controller
 
         abort(404, 'File PDF tidak ditemukan.');
     }
+
+    public function importDocx(Request $request)
+    {
+        $request->validate([
+            'docx_file' => 'required|file|mimes:docx,doc|max:20480',
+        ]);
+
+        $file = $request->file('docx_file');
+        $tempPath = storage_path('app/temp_' . uniqid() . '.docx');
+        $file->move(dirname($tempPath), basename($tempPath));
+
+        $pythonBin = '/home/ubs/.hermes/hermes-agent/venv/bin/python3';
+        $scriptPath = base_path('app/Services/DocxConverter.py');
+
+        $command = escapeshellcmd("$pythonBin $scriptPath " . escapeshellarg($tempPath));
+        $output = shell_exec($command);
+
+        if (file_exists($tempPath)) {
+            @unlink($tempPath);
+        }
+
+        if (!$output) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mengonversi file DOCX.',
+            ], 500);
+        }
+
+        return response()->json([
+            'success' => true,
+            'html'    => $output,
+        ]);
+    }
 }

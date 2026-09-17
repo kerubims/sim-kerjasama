@@ -340,59 +340,43 @@ function editorPage() {
                             input.onchange = (e) => {
                                 const file = e.target.files[0];
                                 if (file) {
-                                    const reader = new FileReader();
-                                    reader.onload = function(loadEvent) {
-                                        const arrayBuffer = loadEvent.target.result;
-                                        
-                                        const options = {
-                                            styleMap: [
-                                                "p[style-name='Heading 1'] => h1:fresh",
-                                                "p[style-name='Heading 2'] => h2:fresh",
-                                                "p[style-name='Heading 3'] => h3:fresh",
-                                                "p[style-name='Heading 4'] => h4:fresh",
-                                                "p[style-name='Title'] => h1.title",
-                                                "p[style-name='Subtitle'] => h2.subtitle",
-                                                "p[style-name='align-center'] => p.align-center",
-                                                "p[style-name='align-right'] => p.align-right",
-                                                "p[style-name='align-justify'] => p.align-justify",
-                                                "u => u",
-                                                "strike => s"
-                                            ]
-                                        };
+                                    const formData = new FormData();
+                                    formData.append('docx_file', file);
+                                    formData.append('_token', this.csrfToken);
 
-                                        if (window.mammoth && mammoth.transforms && mammoth.transforms.paragraph) {
-                                            options.transformDocument = mammoth.transforms.paragraph(function(paragraph) {
-                                                if (paragraph.alignment === "center") {
-                                                    return {...paragraph, styleName: "align-center"};
-                                                } else if (paragraph.alignment === "right") {
-                                                    return {...paragraph, styleName: "align-right"};
-                                                } else if (paragraph.alignment === "both" || paragraph.alignment === "justify") {
-                                                    return {...paragraph, styleName: "align-justify"};
-                                                }
-                                                return paragraph;
+                                    Swal.fire({
+                                        title: 'Mengonversi DOCX 1:1...',
+                                        text: 'Mohon tunggu sebentar',
+                                        allowOutsideClick: false,
+                                        didOpen: () => Swal.showLoading()
+                                    });
+
+                                    fetch('/documents/import-docx', {
+                                        method: 'POST',
+                                        body: formData
+                                    })
+                                    .then(res => res.json())
+                                    .then(data => {
+                                        Swal.close();
+                                        if (data.success && data.html) {
+                                            editor.setContent(data.html);
+                                            this.isDirty = true;
+                                            Swal.fire({
+                                                icon: 'success',
+                                                title: 'Import Berhasil!',
+                                                text: 'Dokumen Word 1:1 berhasil dimuat ke dalam editor.',
+                                                timer: 2000,
+                                                showConfirmButton: false
                                             });
-                                        }
-
-                                        if (window.mammoth) {
-                                            mammoth.convertToHtml({arrayBuffer: arrayBuffer}, options)
-                                                .then(function(result){
-                                                    let html = result.value;
-                                                    html = html.replace(/class="align-center"/g, 'style="text-align: center;"');
-                                                    html = html.replace(/class="align-right"/g, 'style="text-align: right;"');
-                                                    html = html.replace(/class="align-justify"/g, 'style="text-align: justify;"');
-                                                    editor.setContent(html);
-                                                    if (result.messages.length > 0) {
-                                                        console.warn('Mammoth messages:', result.messages);
-                                                    }
-                                                })
-                                                .catch(function(err) {
-                                                    alert('Gagal membaca file DOCX: ' + err.message);
-                                                });
                                         } else {
-                                            alert('Library mammoth belum dimuat. Tidak dapat mengimport DOCX.');
+                                            Swal.fire('Gagal Import', data.message || 'Gagal konversi file DOCX', 'error');
                                         }
-                                    };
-                                    reader.readAsArrayBuffer(file);
+                                    })
+                                    .catch(err => {
+                                        Swal.close();
+                                        console.error(err);
+                                        Swal.fire('Error', 'Terjadi kesalahan saat mengunggah file.', 'error');
+                                    });
                                 }
                             };
                             input.click();
@@ -512,6 +496,10 @@ function editorPage() {
                     skin: 'oxide',
                     statusbar: true,
                     resize: false,
+                    extended_valid_elements: 'span[*],p[*],table[*],tr[*],td[*],th[*],div[*],img[*],h1[*],h2[*],h3[*],h4[*],h5[*],h6[*]',
+                    valid_children: '+body[style|div],+div[style],+p[style],+td[style]',
+                    verify_html: false,
+                    keep_styles: true,
                     contextmenu: 'addcomment link image table',
                     setup: customSetup
                 });
