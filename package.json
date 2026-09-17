@@ -24,6 +24,7 @@
         "@fortawesome/fontawesome-free": "^7.2.0",
         "@inertiajs/react": "^3.7.1",
         "axios": "^1.15.1",
+        "docx-preview": "^0.4.0",
         "html2pdf.js": "^0.14.0",
         "lucide-react": "^1.47.0",
         "mammoth": "^1.12.0",
