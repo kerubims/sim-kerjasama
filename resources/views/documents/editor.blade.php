@@ -345,37 +345,70 @@ function editorPage() {
                                     formData.append('_token', this.csrfToken);
 
                                     Swal.fire({
-                                        title: 'Mengonversi DOCX 1:1...',
-                                        text: 'Mohon tunggu sebentar',
+                                        title: 'Proses Import Dokumen',
+                                        html: `
+                                            <div style="margin-top: 10px;">
+                                                <div style="font-size: 14px; font-weight: 600; color: #1e293b; margin-bottom: 8px;" id="import-status-title">Memulai pengunggahan...</div>
+                                                <div style="width: 100%; background-color: #e2e8f0; border-radius: 9999px; height: 14px; overflow: hidden; margin: 12px 0; box-shadow: inset 0 1px 2px rgba(0,0,0,0.1);">
+                                                    <div id="import-progress-bar" style="width: 0%; height: 100%; background-color: #2563eb; border-radius: 9999px; transition: width 0.2s ease-in-out;"></div>
+                                                </div>
+                                                <div id="import-progress-text" style="font-size: 13px; color: #64748b; font-weight: 500;">0% selesai</div>
+                                            </div>
+                                        `,
                                         allowOutsideClick: false,
-                                        didOpen: () => Swal.showLoading()
-                                    });
+                                        allowEscapeKey: false,
+                                        showConfirmButton: false,
+                                        didOpen: () => {
+                                            const xhr = new XMLHttpRequest();
+                                            xhr.open('POST', '/documents/import-docx', true);
+                                            xhr.setRequestHeader('X-CSRF-TOKEN', this.csrfToken);
 
-                                    fetch('/documents/import-docx', {
-                                        method: 'POST',
-                                        body: formData
-                                    })
-                                    .then(res => res.json())
-                                    .then(data => {
-                                        Swal.close();
-                                        if (data.success && data.html) {
-                                            editor.setContent(data.html);
-                                            this.isDirty = true;
-                                            Swal.fire({
-                                                icon: 'success',
-                                                title: 'Import Berhasil!',
-                                                text: 'Dokumen Word 1:1 berhasil dimuat ke dalam editor.',
-                                                timer: 2000,
-                                                showConfirmButton: false
-                                            });
-                                        } else {
-                                            Swal.fire('Gagal Import', data.message || 'Gagal konversi file DOCX', 'error');
+                                            xhr.upload.onprogress = (e) => {
+                                                if (e.lengthComputable) {
+                                                    const percent = Math.round((e.loaded / e.total) * 100);
+                                                    const bar = document.getElementById('import-progress-bar');
+                                                    const text = document.getElementById('import-progress-text');
+                                                    const title = document.getElementById('import-status-title');
+
+                                                    if (bar) bar.style.width = percent + '%';
+                                                    if (text) text.textContent = percent + '% selesai';
+                                                    if (title) {
+                                                        title.textContent = percent < 100 
+                                                            ? `Mengunggah berkas (${(e.loaded / (1024*1024)).toFixed(2)} MB)...` 
+                                                            : 'Mengonversi struktur Word 1:1...';
+                                                    }
+                                                }
+                                            };
+
+                                            xhr.onload = () => {
+                                                Swal.close();
+                                                try {
+                                                    const data = JSON.parse(xhr.responseText);
+                                                    if (xhr.status === 200 && data.success && data.html) {
+                                                        editor.setContent(data.html);
+                                                        this.isDirty = true;
+                                                        Swal.fire({
+                                                            icon: 'success',
+                                                            title: 'Import Berhasil!',
+                                                            text: 'Dokumen Word 1:1 berhasil dimuat ke dalam editor.',
+                                                            timer: 2000,
+                                                            showConfirmButton: false
+                                                        });
+                                                    } else {
+                                                        Swal.fire('Gagal Import', data.message || 'Gagal konversi file DOCX', 'error');
+                                                    }
+                                                } catch (err) {
+                                                    Swal.fire('Error', 'Gagal memproses respon dari server.', 'error');
+                                                }
+                                            };
+
+                                            xhr.onerror = () => {
+                                                Swal.close();
+                                                Swal.fire('Error', 'Terjadi kesalahan jaringan saat mengunggah file.', 'error');
+                                            };
+
+                                            xhr.send(formData);
                                         }
-                                    })
-                                    .catch(err => {
-                                        Swal.close();
-                                        console.error(err);
-                                        Swal.fire('Error', 'Terjadi kesalahan saat mengunggah file.', 'error');
                                     });
                                 }
                             };
