@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Document;
+use App\Models\Partner;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -34,7 +35,7 @@ class DashboardController extends Controller
 
         if ($isSuperAdmin) {
             $stats = [
-                'total_mitra' => \App\Models\DocumentParty::where('role_type', 'client')->distinct('user_id')->count(),
+                'total_mitra' => Partner::count(),
                 'active' => Document::where('status', 'signed')->count(),
                 'expiring' => Document::where('status', 'signed')
                                 ->whereNotNull('end_date')
