@@ -64,30 +64,6 @@ services:
     networks:
       - simkerma-network
 
-  queue:
-    image: sim-kerjasama-app
-    restart: unless-stopped
-    working_dir: /var/www/html
-    command: php artisan queue:work --tries=3 --timeout=90
-    environment:
-      APP_ENV: ${APP_ENV:-production}
-      APP_KEY: ${APP_KEY}
-      DB_CONNECTION: mysql
-      DB_HOST: db
-      DB_PORT: 3306
-      DB_DATABASE: ${DB_DATABASE:-sim_kerjasama}
-      DB_USERNAME: ${DB_USERNAME:-simkerma_user}
-      DB_PASSWORD: ${DB_PASSWORD:-secret}
-      GOTENBERG_URL: http://gotenberg:3000
-    volumes:
-      - ./storage/app:/var/www/html/storage/app
-      - ./storage/logs:/var/www/html/storage/logs
-    networks:
-      - simkerma-network
-    depends_on:
-      - app
-      - db
-
 networks:
   simkerma-network:
     driver: bridge

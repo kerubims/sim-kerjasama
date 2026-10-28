@@ -35,21 +35,12 @@
 
 Sebelum memulai instalasi ke lingkungan *production*, pastikan server memenuhi spesifikasi berikut:
 
-### 1. Spesifikasi Perangkat Keras (Hardware)
-| Komponen | Spesifikasi Minimal | Rekomendasi Production |
-|---|---|---|
-| **CPU** | 1 Core (vCPU) | 2 Core atau lebih |
-| **RAM** | 2 GB | 4 GB atau lebih |
-| **Penyimpanan** | 20 GB SSD | 40 GB+ SSD |
-| **Sistem Operasi** | Ubuntu 22.04 / 24.04 LTS | Ubuntu 24.04 LTS / Debian 12 |
-
-### 2. Kebutuhan Perangkat Lunak (Software)
+### 1. Kebutuhan Perangkat Lunak (Software)
 - **Web Server**: Nginx (direkomendasikan) atau Apache 2.4
 - **Bahasa Pemrograman**: PHP >= 8.3 (dengan ekstensi: `pdo_mysql`, `mbstring`, `exif`, `pcntl`, `bcmath`, `gd`, `zip`, `xml`, `curl`, `intl`)
 - **Database Engine**: MySQL >= 8.0 atau MariaDB >= 10.11
 - **Package Manager**: Composer >= 2.6 dan Node.js >= 20.x (NPM >= 10.x)
 - **Document Engine**: Gotenberg 8 (berjalan via Docker pada port `3000`)
-- **Process Manager**: Supervisor (untuk menjalankan *Queue Worker*)
 - **Keamanan**: SSL Certificate (Let's Encrypt / Certbot)
 
 ---
@@ -68,7 +59,7 @@ Pilih salah satu metode deployment di bawah ini:
 Jalankan perintah berikut pada server Linux (contoh: Ubuntu/Debian):
 ```bash
 sudo apt update && sudo apt upgrade -y
-sudo apt install -y software-properties-common curl git unzip zip nginx supervisor
+sudo apt install -y software-properties-common curl git unzip zip nginx
 
 # Tambahkan repositori PHP Ondrej
 sudo add-apt-repository ppa:ondrej/php -y
@@ -225,43 +216,17 @@ sudo apt install -y certbot python3-certbot-nginx
 sudo certbot --nginx -d simkerma.domain-kampus.ac.id
 ```
 
-#### Langkah 11: Setup Queue Worker (Supervisor) & Cron Job
-1. **Supervisor Queue Worker**:
-   Buat konfigurasi worker:
-   ```bash
-   sudo nano /etc/supervisor/conf.d/sim-kerma-worker.conf
-   ```
-   Isi file:
-   ```ini
-   [program:sim-kerma-worker]
-   process_name=%(program_name)s_%(process_num)02d
-   command=php /var/www/sim-kerjasama/artisan queue:work --sleep=3 --tries=3 --max-time=3600
-   autostart=true
-   autorestart=true
-   stopasgroup=true
-   killasgroup=true
-   user=www-data
-   numprocs=2
-   redirect_stderr=true
-   stdout_logfile=/var/www/sim-kerjasama/storage/logs/worker.log
-   stopwaitsecs=3600
-   ```
-   Aktifkan:
-   ```bash
-   sudo supervisorctl reread
-   sudo supervisorctl update
-   sudo supervisorctl start sim-kerma-worker:*
-   ```
+#### Langkah 11: Setup Cron Job (Laravel Scheduler)
+Cron job wajib diaktifkan agar pengecekan otomatis dokumen kedaluwarsa dan peringatan masa tenggang 30 hari (`documents:check-expiry`) dapat berjalan setiap hari.
 
-2. **Cron Job (Laravel Scheduler)**:
-   Jalankan editor crontab untuk user `www-data`:
-   ```bash
-   sudo crontab -u www-data -e
-   ```
-   Tambahkan baris berikut di akhir file:
-   ```cron
-   * * * * * cd /var/www/sim-kerjasama && php artisan schedule:run >> /dev/null 2>&1
-   ```
+Jalankan editor crontab untuk user `www-data`:
+```bash
+sudo crontab -u www-data -e
+```
+Tambahkan baris berikut di akhir file:
+```cron
+* * * * * cd /var/www/sim-kerjasama && php artisan schedule:run >> /dev/null 2>&1
+```
 
 #### Langkah 12: Menjalankan Gotenberg Server (Document Engine)
 Layanan Gotenberg digunakan untuk konversi file Word (.docx) ke PDF. Jalankan service Gotenberg via Docker:
@@ -275,14 +240,13 @@ sudo docker run -d --restart always --name gotenberg -p 127.0.0.1:3000:3000 gote
 
 ### METODE 2: Menggunakan Docker & Docker Compose
 
-Metode ini mengemas seluruh komponen aplikasi (*App*, *Web Server Nginx*, *MySQL 8.0*, *Gotenberg*, dan *Queue Worker*) ke dalam container terisolasi.
+Metode ini mengemas seluruh komponen aplikasi (*App*, *Web Server Nginx*, *MySQL 8.0*, dan *Gotenberg*) ke dalam container terisolasi.
 
 #### Arsitektur Container
 - **`app`**: PHP 8.3-FPM dengan ekstensi lengkap dan source code aplikasi.
 - **`webserver`**: Nginx Alpine sebagai reverse proxy ke aplikasi pada port `80`/`443`.
 - **`db`**: MySQL 8.0 dengan volume persisten data.
 - **`gotenberg`**: Gotenberg 8 API untuk konversi dokumen.
-- **`queue`**: Background queue worker untuk pemrosesan asynchronous.
 
 #### Langkah 1: Persiapan Server
 Pastikan Docker dan Docker Compose telah terpasang:
@@ -334,7 +298,7 @@ Periksa status seluruh container:
 ```bash
 docker compose ps
 ```
-Pastikan seluruh service (`app`, `webserver`, `db`, `gotenberg`, `queue`) berstatus *Up* / *healthy*.
+Pastikan seluruh service (`app`, `webserver`, `db`, `gotenberg`) berstatus *Up* / *healthy*.
 
 #### Langkah 5: Inisialisasi Aplikasi dalam Container
 Jalankan perintah inisialisasi Laravel melalui container `app`:
@@ -413,7 +377,6 @@ npm ci && npm run build
 php artisan migrate --force
 php artisan optimize:clear
 php artisan optimize
-sudo supervisorctl restart sim-kerma-worker:*
 
 php artisan up # Matikan maintenance mode
 ```
