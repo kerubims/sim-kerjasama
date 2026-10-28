@@ -2,14 +2,13 @@
     <div class="flex min-h-screen flex-col justify-center px-6 py-12 lg:px-8 bg-slate-100">
         <div class="sm:mx-auto sm:w-full sm:max-w-sm">
             <div class="flex justify-center mb-4">
-                <div class="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
-                    <i class="fa-solid fa-graduation-cap text-2xl"></i>
-                </div>
+                <img src="{{ asset('images/logo.png') }}" alt="Logo STMIK PPKIA PRADNYA PARAMITA" class="h-24 w-auto object-contain drop-shadow-sm">
             </div>
             <h2 class="text-center text-2xl font-bold leading-9 tracking-tight text-slate-900">
                 Sistem Administrasi Kerjasama
             </h2>
-            <p class="mt-2 text-center text-sm text-slate-500">Masuk ke akun Anda untuk melanjutkan</p>
+            <p class="text-center text-sm font-semibold text-blue-700">STMIK PPKIA Pradnya Paramita</p>
+            <p class="mt-1 text-center text-sm text-slate-500">Masuk ke akun Anda untuk melanjutkan</p>
         </div>
 
         <div class="mt-8 sm:mx-auto sm:w-full sm:max-w-sm">

@@ -8,10 +8,11 @@
 <div class="w-64 bg-white border-r border-slate-200 flex flex-col shrink-0">
     <!-- Logo -->
     <div class="p-6 flex items-center gap-3">
-        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-            <i class="fa-solid fa-graduation-cap"></i>
+        <img src="{{ asset('images/logo.png') }}" alt="Logo STMIK PPKIA" class="h-10 w-auto object-contain">
+        <div class="flex flex-col">
+            <span class="font-bold text-base text-slate-800 tracking-tight leading-none">SIM-KERMA</span>
+            <span class="text-[10px] text-slate-500 font-medium leading-none mt-1">STMIK PPKIA</span>
         </div>
-        <span class="font-bold text-lg text-slate-800 tracking-tight">SIM-KERMA</span>
     </div>
 
     <!-- Navigation -->
