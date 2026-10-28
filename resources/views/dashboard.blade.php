@@ -215,7 +215,7 @@
                         @endif
                         {{ $doc->title }}
                         @if($doc->parent_id)
-                            <div class="text-xs text-slate-500 mt-1">Rujukan: {{ $doc->parent->document_number ?? $doc->parent->title ?? '' }}</div>
+                            <div class="text-xs text-slate-500 mt-1">Rujukan: {{ $doc->parent?->document_number ?? $doc->parent?->title ?? '-' }}</div>
                         @endif
                     </td>
                     <td class="px-6 py-4">

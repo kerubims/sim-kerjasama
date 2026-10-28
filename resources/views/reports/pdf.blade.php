@@ -37,8 +37,8 @@
                 <td class="text-center">{{ $idx + 1 }}</td>
                 <td>
                     {{ $doc->title }}
-                    @if($doc->parent)
-                        <br><small style="color:#666;">Ref: {{ $doc->parent->title }}</small>
+                    @if($doc->parent_id && $doc->parent)
+                        <br><small style="color:#666;">Ref: {{ $doc->parent?->document_number ?? $doc->parent?->title ?? '-' }}</small>
                     @endif
                 </td>
                 <td class="text-center">{{ strtoupper($doc->type) }}</td>

@@ -32,7 +32,7 @@ class Document extends Model
 
     public function parent()
     {
-        return $this->belongsTo(Document::class, 'parent_id');
+        return $this->belongsTo(Document::class, 'parent_id')->withTrashed();
     }
 
     public function children()

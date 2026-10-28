@@ -1,4 +1,4 @@
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test('halaman utama dapat dimuat dan memiliki judul yang benar', async ({ page }) => {
   // Navigasi ke halaman utama aplikasi Anda (berdasarkan baseURL di config)
