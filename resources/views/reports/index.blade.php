@@ -211,7 +211,7 @@
                         @endphp
                         <span class="px-2 py-1 rounded text-xs font-medium {{ $typeClass }}">{{ strtoupper($doc->type) }}</span>
                     </td>
-                    <td class="px-6 py-3">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->nama_mitra ?? $p->user->partner->name ?? $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-3">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user?->nama_mitra ?? $p->user?->partner?->name ?? $p->user?->name ?? '-')->join(', ') ?: '-' }}</td>
                     <td class="px-6 py-3">{{ $doc->created_at->format('d M Y') }}</td>
                     <td class="px-6 py-3">{{ $doc->end_date ? \Carbon\Carbon::parse($doc->end_date)->format('d M Y') : '-' }}</td>
                     <td class="px-6 py-3">

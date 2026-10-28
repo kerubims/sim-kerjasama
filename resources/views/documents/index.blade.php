@@ -280,9 +280,9 @@
                             <span class="text-slate-400">-</span>
                         @endif
                     </td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->partner->name ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user->name ?? '-')->join(', ') ?: '-' }}</td>
-                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user->proposerUnit->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user?->partner?->name ?? $p->user?->nama_mitra ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'client')->map(fn($p) => $p->user?->name ?? '-')->join(', ') ?: '-' }}</td>
+                    <td class="px-6 py-4">{{ $doc->parties->where('role_type', 'unit_pengusul')->map(fn($p) => $p->user?->proposerUnit?->name ?? $p->user?->jabatan ?? '-')->join(', ') ?: '-' }}</td>
                     @if(auth()->user()->role === 'super_admin')
                     <td class="px-6 py-4">{{ $doc->created_at->format('d M Y') }}</td>
                     @endif

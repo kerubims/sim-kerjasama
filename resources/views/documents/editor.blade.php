@@ -199,7 +199,7 @@
                 <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
                     <div class="absolute -left-[5px] top-0 w-2.5 h-2.5 rounded-full bg-blue-500"></div>
                     <div class="text-xs text-slate-400 mb-1">{{ $h->created_at->format('d M Y H:i') }}</div>
-                    <div class="text-sm font-medium text-slate-800">{{ $h->user->name }}</div>
+                    <div class="text-sm font-medium text-slate-800">{{ $h->user?->name ?? 'User' }}</div>
                     <div class="text-xs text-slate-600 mt-1">{{ $h->message }}</div>
                 </div>
                 @endforeach
@@ -211,10 +211,10 @@
                     @forelse($doc->comments->sortByDesc('created_at') as $c)
                     <div class="comment-block bg-slate-50 rounded-lg p-3 border border-slate-200 cursor-pointer hover:bg-slate-100 transition {{ $c->is_resolved ? 'opacity-60' : '' }}" @click="scrollToAnchor('{{ $c->anchor_id }}')">
                         <div class="flex items-start gap-2 mb-2">
-                            <img src="https://ui-avatars.com/api/?name={{ urlencode($c->user->name) }}&background=0D8ABC&color=fff" class="w-6 h-6 rounded-full mt-0.5" alt="">
+                            <img src="https://ui-avatars.com/api/?name={{ urlencode($c->user?->name ?? 'User') }}&background=0D8ABC&color=fff" class="w-6 h-6 rounded-full mt-0.5" alt="">
                             <div class="flex-1">
                                 <div class="flex items-center justify-between mb-1">
-                                    <div class="text-xs font-semibold text-slate-700">{{ $c->user->name }}</div>
+                                    <div class="text-xs font-semibold text-slate-700">{{ $c->user?->name ?? 'User' }}</div>
                                     @if($c->is_resolved)
                                     <span class="text-[10px] font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700 ml-2"><i class="fa-solid fa-check mr-1"></i>Selesai</span>
                                     @else
@@ -249,7 +249,7 @@
                 <div class="space-y-3">
                     @foreach($doc->parties as $party)
                     <div class="border border-slate-200 rounded p-2 bg-white">
-                        <div class="text-xs text-slate-400 mb-1">{{ $party->user->name }} ({{ $party->role_type === 'client' ? 'Mitra' : 'Unit Pengusul' }})</div>
+                        <div class="text-xs text-slate-400 mb-1">{{ $party->user?->name ?? 'User Tidak Ditemukan' }} ({{ $party->role_type === 'client' ? 'Mitra' : 'Unit Pengusul' }})</div>
                         @if($party->signature_path === 'offline_signed')
                         <div class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded border border-blue-200 inline-block mt-1">
                             <i class="fa-solid fa-file-signature mr-1"></i> Ditandatangani Offline
@@ -924,9 +924,9 @@ function editorPage() {
 
             // Menggunakan path relatif (/storage/...) agar html2canvas tidak terblokir CORS
             const parties = {!! json_encode($doc->parties->map(fn($p) => [
-                'name' => $p->user->name,
+                'name' => $p->user?->name ?? 'User',
                 'role' => $p->role_type,
-                'mitra_name' => $p->user->nama_mitra,
+                'mitra_name' => $p->user?->nama_mitra ?? $p->user?->partner?->name ?? '',
                 'sig' => $p->signature_path ? '/storage/' . $p->signature_path : null,
                 'stamp' => $p->stamp_path ? '/storage/' . $p->stamp_path : null
             ])) !!};
